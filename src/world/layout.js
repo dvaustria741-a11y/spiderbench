@@ -971,6 +971,9 @@ export function buildBlocks() {
         if (nb) { split = streets[k + 1]; z1 = nb.z1; x0 = Math.max(x0, nb.x0); x1 = Math.min(x1, nb.x1); }
       }
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      // mobile "lite" mode (index.html sets __LITE_R on touch devices): only build blocks within R metres of the spawn,
+      // the full island exhausts a phone WebView's memory during generation
+      if (globalThis.__LITE_R && Math.hypot(cx - 250, cz - 170) > globalThis.__LITE_R) { if (split) k++; continue; }
       blocks.push({
         x0, x1, z0, z1, core: true, ci: c / 2 - 1, rj: k, col: c,
         px0: x0 + G.AV_WALK, px1: x1 - G.AV_WALK,
