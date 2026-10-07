@@ -14,7 +14,7 @@
 .op-card { height: min(46vh, 280px); border: 0; border-radius: 14px; background: #02030a; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; font: 700 clamp(18px, 3.4vh, 26px) var(--sys-body); }
 .op-card .ic svg { width: clamp(48px, 10vh, 76px); height: clamp(48px, 10vh, 76px); }
 .op-card:active { background: #14000a; outline: 2px solid #f00; }
-.op-body.list { width: min(58%, 760px); overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 90px 0; touch-action: pan-y; scrollbar-width: none; }
+.op-body.list { width: min(54%, 720px); overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 90px 0; touch-action: pan-y; scrollbar-width: none; }
 .op-body.list::-webkit-scrollbar { display: none; }
 .op-row { display: flex; align-items: center; min-height: 64px; margin-bottom: 8px; padding: 0 12px 0 14px; border-radius: 10px; background: #02030a; }
 .op-row label { flex: 0 0 38%; font: 700 clamp(17px, 3.2vh, 24px) var(--sys-body); line-height: 1.1; }
@@ -24,7 +24,7 @@
 .op-slider { position: relative; flex: 1; height: 50px; border-radius: 8px; background: #383838; overflow: hidden; touch-action: none; cursor: pointer; }
 .op-slider i { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: #f00; border-radius: 8px; }
 .op-slider span { position: absolute; right: 12px; top: 0; bottom: 0; display: flex; align-items: center; font: 700 16px var(--sys-body); color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
-.op-desc { position: absolute; right: max(28px, env(safe-area-inset-right)); bottom: 18%; width: min(38%, 520px); padding: 18px 22px; border-radius: 12px; background: rgba(0, 0, 0, .7); font: 500 clamp(15px, 2.7vh, 21px)/1.4 var(--sys-body); pointer-events: none; }
+.op-desc { position: absolute; right: max(28px, env(safe-area-inset-right)); bottom: 18%; width: min(36%, 520px); padding: 18px 22px; border-radius: 12px; background: rgba(0, 0, 0, .7); font: 500 clamp(15px, 2.7vh, 21px)/1.4 var(--sys-body); pointer-events: none; }
 .op-desc:empty { display: none; }
 .op-apply { position: absolute; left: max(28px, env(safe-area-inset-left)); bottom: 12px; display: none; align-items: center; gap: 16px; padding: 10px 14px; border-radius: 10px; background: #1a0508; border: 1px solid #f00; font: 600 15px var(--sys-body); }
 .op-apply.on { display: flex; }
