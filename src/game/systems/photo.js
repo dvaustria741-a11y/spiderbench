@@ -148,7 +148,10 @@ export function createPhoto(sys) {
         const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
         const a = document.createElement('a'); a.href = url; a.download = `spider-man_${stamp}.png`;
         // automated runs (?playtest) don't download unless ?photodl
-        const q = new URLSearchParams(location.search); if (!q.has('playtest') || q.has('photodl')) { document.body.appendChild(a); a.click(); a.remove(); }
+        const q = new URLSearchParams(location.search);
+        if (window.SpiderbenchNative?.savePhoto) { // Android app: MediaStore -> Pictures/Spiderbench
+          const rd = new FileReader(); rd.onload = () => { try { window.SpiderbenchNative.savePhoto(String(rd.result).split(',')[1], `spiderbench_${stamp}.png`); } catch (e) { console.warn('[photo] native save failed', e); } }; rd.readAsDataURL(blob);
+        } else if (!q.has('playtest') || q.has('photodl')) { document.body.appendChild(a); a.click(); a.remove(); }
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         window.__lastPhoto = { width: c.width, height: c.height, bytes: blob.size, items: items.map(i => i.id) };
         emit('photo:captured', { items: items.map(i => i.id), thumb, width: c.width, height: c.height });

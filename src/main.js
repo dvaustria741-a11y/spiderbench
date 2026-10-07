@@ -115,7 +115,8 @@ if (shotName) {
   let lastDraw = 0;
   renderer.setAnimationLoop(() => {
     // Options > Display > Frame Rate: ctx.fpsCap (0 = every display refresh)
-    if (ctx.fpsCap) { const now = performance.now(); if (now - lastDraw < 1000 / ctx.fpsCap - 2) return; lastDraw = now; }
+    const cap = ctx.menuActive ? (ctx.fpsCap && ctx.fpsCap < 30 ? ctx.fpsCap : 30) : ctx.fpsCap; // title screen: 30 fps max
+    if (cap) { const now = performance.now(); if (now - lastDraw < 1000 / cap - 2) return; lastDraw = now; }
     const d = Math.min(clock.getDelta(), 1 / 20);
     if (!ctx.manualStep) frame(d);
   });

@@ -14,7 +14,7 @@ export function createPhotoUI(sys) {
     <div class="lm"></div>
     <div class="hints"><span><span class="sys-key">WASD</span>Move</span><span><span class="sys-key">Q</span><span class="sys-key">E</span>Down / Up</span><span><span class="sys-key">Drag</span>Look</span>
       <span><span class="sys-key">Wheel</span>Zoom</span><span><span class="sys-key">R</span>Autofocus</span><span><span class="sys-key">H</span>Hide UI</span><span><span class="sys-key">Enter</span>Capture</span><span><span class="sys-key">Esc</span>Exit</span></div>
-    <div class="flash"></div><div class="saved sys-panel"><img alt=""><div>Saved to downloads</div></div>`;
+    <div class="flash"></div><div class="saved sys-panel"><img alt=""><div>Saved</div></div>`;
   ui.root.appendChild(el);
   const st = photo.state, body = el.querySelector('.pbody'), frameC = el.querySelector('canvas.frame');
   let tab = 'cam', open = false;
@@ -59,7 +59,7 @@ export function createPhotoUI(sys) {
     const s = el.querySelector('.saved'); s.querySelector('img').removeAttribute('src'); s.querySelector('div').textContent = 'Saving…'; s.classList.add('on', 'busy'); clearTimeout(s._t);
     const sel = selSt; selSt = null; drawOverlay(); // capture has no selection box
     const { thumb, items } = await photo.capture();
-    selSt = sel; drawOverlay(); s.classList.remove('busy'); s.querySelector('img').src = thumb; s.querySelector('div').textContent = items.length ? `${items.map(i => i.name).join(', ')} — saved` : 'Saved to downloads';
+    selSt = sel; drawOverlay(); s.classList.remove('busy'); s.querySelector('img').src = thumb; s.querySelector('div').textContent = items.length ? `${items.map(i => i.name).join(', ')} — saved` : (window.SpiderbenchNative ? 'Saved to Gallery (Pictures/Spiderbench)' : 'Saved to downloads');
     s.classList.add('on'); clearTimeout(s._t); s._t = setTimeout(() => s.classList.remove('on'), 3200);
   }
 

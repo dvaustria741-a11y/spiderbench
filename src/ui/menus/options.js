@@ -89,7 +89,7 @@ export function createOptionsPanel(sys, { onClose } = {}) {
       gcho('bloom', 'Bloom', ONOFF, 'Glow around bright lights. Applies instantly.'),
       gcho('population', 'Population Density', LMH, 'How many pedestrians fill the streets.'),
       gcho('traffic', 'Vehicle Density', [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], 'How many cars are on the road. Applies instantly.'),
-      gcho('drawDist', 'Draw Distance', [['low', 'Low (0.9 km)'], ['medium', 'Medium (1.3 km)'], ['high', 'High (2.2 km)'], ['full', 'Full island']], 'How much of the city is built around the start. Smaller loads faster and uses far less memory.'),
+      gcho('drawDist', 'Draw Distance', [['low', 'Low (0.75 km)'], ['medium', 'Medium (1.3 km)'], ['high', 'High (2.2 km)'], ['full', 'Full island']], 'How much of the city is built around the start. Smaller loads faster and uses far less memory.'),
     ],
     audio: [
       sli('masterVolume', 'Master Volume', 0, 1, 0.01, 'Everything.'), sli('musicVolume', 'Music', 0, 1, 0.01, 'Ambient score and the swing pulse.'),
@@ -160,17 +160,22 @@ export function createOptionsPanel(sys, { onClose } = {}) {
     refreshRows(); updateApply();
   }
 
+  let applyRaf = 0;
+  const applySoon = row => { cancelAnimationFrame(applyRaf); applyRaf = requestAnimationFrame(() => { try { afterChange(row); } catch (e) { console.warn('[options] apply failed', e); } }); };
   function bindSlider(rowEl, r) {
-    const bar = rowEl.querySelector('.op-slider'); let id = null;
+    const bar = rowEl.querySelector('.op-slider'), ctl = rowEl.querySelector('.ctl'); let id = null;
     const set = e => {
-      const b = bar.getBoundingClientRect(); let f = Math.max(0, Math.min(1, (e.clientX - b.left) / b.width));
+      const b = bar.getBoundingClientRect(); if (!b.width) return;
+      let f = Math.max(0, Math.min(1, (e.clientX - b.left) / b.width));
       let v = r.min + f * (r.max - r.min); v = Math.round(v / r.step) * r.step; v = +v.toFixed(4);
-      if (v === S()[r.key]) return; setRow(r, v); refreshRows();
+      if (v === S()[r.key]) return;
+      S()[r.key] = v; if (r.disp) S().displayPreset = 'custom'; // bar + value text update immediately...
+      refreshRows(); applySoon(r); // ...the (heavier) setting is applied on the next frame, and a failure there can no longer freeze the slider
     };
-    bar.addEventListener('pointerdown', e => { id = e.pointerId; bar.setPointerCapture(id); set(e); });
-    bar.addEventListener('pointermove', e => { if (e.pointerId === id) set(e); });
-    const end = e => { if (e.pointerId === id) { id = null; audio.sfx.move(); } };
-    bar.addEventListener('pointerup', end); bar.addEventListener('pointercancel', end);
+    const move = e => { if (e.pointerId === id) { e.preventDefault(); set(e); } };
+    const end = e => { if (e.pointerId !== id) return; id = null; removeEventListener('pointermove', move); removeEventListener('pointerup', end); removeEventListener('pointercancel', end); audio.sfx.move(); };
+    ctl.style.touchAction = 'none'; // the whole control area is the drag target
+    ctl.addEventListener('pointerdown', e => { if (id !== null) return; id = e.pointerId; e.preventDefault(); addEventListener('pointermove', move, { passive: false }); addEventListener('pointerup', end); addEventListener('pointercancel', end); set(e); });
   }
 
   function refreshRows() {

@@ -58,7 +58,7 @@ export function createMainMenu(sys, ctx) {
 
   // ---- hero camera (the live character, front-on, turning slowly; the camera keeps clear of walls)
   const _c = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _t = new THREE.Vector3(), _d = new THREE.Vector3();
-  let yaw = 0, dist = 3.2, camSave = null, active = false, dragX = null;
+  let yaw = 0, dist = 3.2, camSave = null, active = false, dragX = null, cityNode = null;
   function cameraHook(dt) {
     const cam = ctx.camera, P = ctx.player;
     yaw += dt * (dragX == null ? 0.1 : 0);
@@ -84,6 +84,8 @@ export function createMainMenu(sys, ctx) {
     const P = ctx.player.position, c = ctx.camera.position; yaw = Math.atan2(c.x - P.x, c.z - P.z) + Math.PI + 0.5; // start on the side opposite the chase camera
     const sub = $('.sub'); sub.textContent = `Level ${sys.prog.level} · ${save.persistent ? 'Local save' : 'Test session'}`;
     flow.setMode('menu'); flow.setCameraHook(cameraHook); ui.setVisible(false);
+    cityNode = ctx.scene.getObjectByName('city'); if (cityNode) cityNode.visible = false; // the title screen only needs the hero + sky: no city draw calls
+    ctx.menuActive = true; // main.js caps the frame rate at 30 while the menu is up
     el.classList.remove('fadeout'); el.classList.add('on'); ctx.pipeline.resetHistory?.();
     window.__sysMenu = { open: true, tab: 'main' };
   }
@@ -91,6 +93,7 @@ export function createMainMenu(sys, ctx) {
     if (!active) return; active = false; audio.sfx.select(); audio.sfx.open?.();
     el.classList.add('fadeout');
     ctx.camera.position.copy(camSave.p); ctx.camera.quaternion.copy(camSave.q); ctx.camera.fov = camSave.fov; ctx.camera.updateProjectionMatrix();
+    if (cityNode) cityNode.visible = true; ctx.menuActive = false;
     flow.setMode('play'); ui.setVisible(true); ctx.pipeline.resetHistory?.();
     setTimeout(() => { el.classList.remove('on', 'fadeout'); }, 500);
     if (!matchMedia('(pointer: coarse)').matches) ctx.renderer.domElement.requestPointerLock?.();

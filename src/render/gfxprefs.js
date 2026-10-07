@@ -21,7 +21,7 @@ const SHADOW_DIST = {
   high:   { cascades: 5, shadowFar: 3000, splits: [0.1, 14, 50, 200, 800, 3000] },
 };
 export const POP_SCALE = { low: 0.5, medium: 0.8, high: 1 };
-export const LITE_RADIUS = { low: 900, medium: 1300, high: 2200, full: 0 }; // metres around the spawn; 0 = whole island
+export const LITE_RADIUS = { low: 750, medium: 1300, high: 2200, full: 0 }; // metres around the spawn; 0 = whole island
 
 export function readSettings() {
   try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return s && s.settings ? s.settings : {}; } catch { return {}; }
