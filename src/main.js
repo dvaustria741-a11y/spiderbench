@@ -110,13 +110,17 @@ if (shotName) {
       return;
     }
     const dt = ctx.realDt * (ctx.timeScale ?? 1);
-    const t0 = performance.now();
-    player.update(dt); world.update(dt, camera); lighting.update(camera); hud.update(dt);
+    const n = performance.now, a = n.call(performance);
+    player.update(dt); const b = n.call(performance);
+    world.update(dt, camera); const c = n.call(performance);
+    lighting.update(camera); const d2 = n.call(performance);
+    hud.update(dt); const e = n.call(performance);
     for (const s of ctx.systems) s.update?.(dt);
-    const t1 = performance.now();
+    const t1 = n.call(performance);
     pipeline.render(dt);
-    const t2 = performance.now(); const P = ctx.perf || (ctx.perf = { upd: 0, rnd: 0, frame: 0 });
-    P.upd += (t1 - t0 - P.upd) * 0.1; P.rnd += (t2 - t1 - P.rnd) * 0.1; P.frame += (realDt * 1000 - P.frame) * 0.1;
+    const t2 = n.call(performance); const P = ctx.perf || (ctx.perf = { upd: 0, rnd: 0, frame: 0, pl: 0, wo: 0, li: 0, hu: 0, sy: 0 });
+    const k = 0.1, sm = (key, v) => { P[key] += (v - P[key]) * k; };
+    sm('upd', t1 - a); sm('rnd', t2 - t1); sm('frame', (ctx.rawDt ?? realDt) * 1000); sm('pl', b - a); sm('wo', c - b); sm('li', d2 - c); sm('hu', e - d2); sm('sy', t1 - e);
     warmup?.step(); // (perf r3)
     if (++framesDrawn === 1) boot.sub(0.4); // the first frame (remaining uploads / links) is in
   }
@@ -128,7 +132,8 @@ if (shotName) {
     // Options > Display > Frame Rate: ctx.fpsCap (0 = every display refresh)
     const cap = ctx.menuActive ? 20 : ctx.fpsCap; // title screen: 20 fps is plenty for a slowly turning hero
     if (cap) { const now = performance.now(); if (now - lastDraw < 1000 / cap - 2) return; lastDraw = now; }
-    const d = Math.min(clock.getDelta(), 1 / 20);
+    const raw = clock.getDelta(); ctx.rawDt = raw; // unclamped, for the FPS readout
+    const d = Math.min(raw, 1 / 20);
     if (!ctx.manualStep) frame(d);
   });
 }

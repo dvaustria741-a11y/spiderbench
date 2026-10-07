@@ -109,7 +109,7 @@ export function createLighting({ renderer, scene }) {
   const quality = getQuality();
   installSurfaceChunks(quality);
   const reversed = !!renderer.capabilities.reversedDepthBuffer;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = quality.shadowsOn !== false; // Options > Graphics > Shadows: Off = no shadow passes
   renderer.shadowMap.type = THREE.PCFShadowMap; // hardware PCF (PCFSoft was removed in r18x)
   renderer.shadowMap.autoUpdate = true;
 
@@ -407,7 +407,7 @@ export function createLighting({ renderer, scene }) {
       // high-res character shadow cascade follows the player (feature-detected)
       const po = (typeof window !== 'undefined') ? window.__ctx?.player?.object : null;
       if (po) { po.getWorldPosition(_pp); csm.setFocus(_pp); if ((state.charScan = (state.charScan || 0) + 1) % 30 === 1) csm.setCharacter(po); } else csm.setFocus(null);
-      csm.update(camera, scene);
+      if (quality.shadowsOn !== false) csm.update(camera, scene);
       cityLights.build(camera); // (night) local light grid around the camera
       { const o = cityLights.shared.origin; ambShared.cgrid.set(o.x, o.y, o.z * 64, o.w); }
     },

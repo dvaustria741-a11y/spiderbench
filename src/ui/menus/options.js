@@ -78,7 +78,7 @@ export function createOptionsPanel(sys, { onClose } = {}) {
     ],
     graphics: [
       cho('gfxPreset', 'Preset', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['custom', 'Custom']], 'Sets every graphics option below in one go. Change any of them by hand and the preset turns to Custom.', { preset: 'gfx' }),
-      gcho('shadows', 'Shadows', LMH, 'Softness of shadow edges and whether the character casts one.'),
+      gcho('shadows', 'Shadows', [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], 'Off skips the shadow passes completely and is the biggest single frame-rate gain on a phone. Higher settings soften the edges and let the character cast a shadow.'),
       gcho('shadowRes', 'Shadow Resolution', LMH, 'Detail of the shadow maps.'),
       gcho('shadowDist', 'Shadow Distance', LMH, 'How far from the camera shadows are drawn.'),
       gcho('aa', 'Anti Aliasing', [['on', 'TAA'], ['off', 'Off']], 'Temporal anti-aliasing smooths jagged edges.'),

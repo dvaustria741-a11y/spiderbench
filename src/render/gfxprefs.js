@@ -41,7 +41,8 @@ export function applyGfxToQuality(q, g) {
   const pick = (map, v) => map[v] ?? null;
   const sd = pick(SHADOW_DIST, g.shadowDist); if (sd) Object.assign(q, { cascades: sd.cascades, shadowFar: sd.shadowFar, splits: sd.splits.slice() });
   q.shadowMapSize = { low: 512, medium: 1024, high: 2048 }[g.shadowRes] ?? q.shadowMapSize;
-  const sh = { low: [5, 0], medium: [8, 1024], high: [10, 2048] }[g.shadows]; if (sh) { q.shadowTaps = sh[0]; q.charShadow = sh[1]; }
+  const sh = { off: [1, 0], low: [5, 0], medium: [8, 1024], high: [10, 2048], ultra: [14, 2048] }[g.shadows]; if (sh) { q.shadowTaps = sh[0]; q.charShadow = sh[1]; }
+  q.shadowsOn = g.shadows !== 'off'; // Off: no shadow passes at all (lighting.js turns the shadow map off)
   if (g.aa) q.taa = g.aa !== 'off';
   if (g.ao === 'off') q.ao = false;
   else if (g.ao === 'low') Object.assign(q, { ao: true, aoHalfRes: true, aoQuality: 'Low' });
