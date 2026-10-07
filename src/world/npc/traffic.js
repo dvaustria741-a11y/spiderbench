@@ -31,7 +31,7 @@ const PLAYER_R = 0.5;        // player body half-width used by drivers (arms + s
 // (the edge inflow can't replace the cars driving out of the 640 m radius: ~1000 cars at load -> ~320 after 5 min with the
 // camera parked), so a stationary view emptied out whatever the spawn gaps were. The refill below tops links up out of view.
 const DENSITY = { av: 31, st: 44, ws: 20, dg: 41, dg1: 80, map: 27, br: 31 }; // br: bridge decks (roads.js BRIDGE_DENSITY) // dg1: one-way lower Broadway (2 lanes carry what 4 did)
-let densityScale = 1; // api.setDensity(k): scales DENSITY
+let densityScale = globalThis.__TRAFFIC_SCALE ?? 1; // boot value from Options > Graphics > Vehicle Density (index.html), so Low applies before any car is spawned
 
 export const VTYPES = {
   // (vehicles r1) real-world sizes of the Blender models (tools/blender/city_vehicles.py SPECS)

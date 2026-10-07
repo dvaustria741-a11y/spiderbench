@@ -94,7 +94,7 @@ export function initSystems(ctx) {
     g.bloom = gradeBase.bloom * (s.gfx?.bloom === 'off' ? 0 : 1);
     ctx.fpsCap = FPS[s.frameRate] ?? 0;
     // Graphics: traffic density is live (the rest of the Graphics list applies after a restart)
-    const td = { off: 0, low: 0.5, medium: 1, high: 1.4 }[s.gfx?.traffic];
+    const td = { off: 0, low: 0.4, medium: 1, high: 1.4 }[s.gfx?.traffic];
     if (td != null) ctx.world.life?.traffic?.setDensity?.(td);
     // touch controls
     const tui = document.getElementById('touch-ui');
