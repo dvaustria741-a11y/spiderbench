@@ -24,6 +24,7 @@ import { createSkillFx } from './skillfx.js';
 import { createUI } from '../../ui/menus/ui.js';
 import { createPauseMenu } from '../../ui/menus/pause.js';
 import { createPhotoUI } from '../../ui/menus/photo.js';
+import { createMainMenu } from '../../ui/menus/mainmenu.js';
 
 export function initSystems(ctx) {
   if (ctx.sys) return ctx.sys;
@@ -62,6 +63,7 @@ export function initSystems(ctx) {
   sys.photo = createPhoto(sys);
   sys.pause = createPauseMenu(sys);
   sys.photoUI = createPhotoUI(sys);
+  sys.mainMenu = createMainMenu(sys, ctx);
   // developer menu (~): dev server, or ?dev on a build (registered after the pause menu: its keys win)
   if (import.meta.env?.DEV || new URLSearchParams(location.search).has('dev')) sys.dev = createDevMenu(sys);
   // user r-symbiote: Classic / Stealth / Negative / Noir were removed; old saves wearing one fall back to Advanced
@@ -78,15 +80,37 @@ export function initSystems(ctx) {
   if (pipe.setAperture) { const o = pipe.setAperture.bind(pipe); pipe.setAperture = a => o(flow.mode === 'photo' ? a : a * (save.state.settings.dof ?? 1)); }
   if (pipe.setDof) { const o = pipe.setDof.bind(pipe); pipe.setDof = (d = {}) => o(d.aperture !== undefined && flow.mode !== 'photo' ? { ...d, aperture: d.aperture * (save.state.settings.dof ?? 1) } : d); }
   let appliedScale = null;
+  // Options > Display: brightness / contrast / saturation / sharpness scale the pipeline's tuned grade (0.5 = unchanged)
+  let gradeBase = null;
+  const FPS = { low: 30, medium: 45, high: 60, max: 0 };
+  function applyDisplay(s) {
+    const g = ctx.pipeline.grade; if (!g) return;
+    gradeBase = gradeBase || { exposure: g.exposure, contrast: g.contrast, saturation: g.saturation, sharpen: g.sharpen, bloom: g.bloom };
+    const b = s.brightness ?? 0.5, c = s.contrast ?? 0.5, sa = s.saturation ?? 0.5, sh = s.sharpness ?? 0.5;
+    g.exposure = gradeBase.exposure * (0.6 + 0.8 * b);
+    g.contrast = gradeBase.contrast * (0.7 + 0.6 * c);
+    g.saturation = gradeBase.saturation * (0.4 + 1.2 * sa);
+    g.sharpen = gradeBase.sharpen * (sh * 2) + (s.upscaler ? 0.2 : 0);
+    g.bloom = gradeBase.bloom * (s.gfx?.bloom === 'off' ? 0 : 1);
+    ctx.fpsCap = FPS[s.frameRate] ?? 0;
+    // Graphics: traffic density is live (the rest of the Graphics list applies after a restart)
+    const td = { off: 0, low: 0.5, medium: 1, high: 1.4 }[s.gfx?.traffic];
+    if (td != null) ctx.world.life?.traffic?.setDensity?.(td);
+    // touch controls
+    const tui = document.getElementById('touch-ui');
+    if (tui) { tui.style.setProperty('--tbs', String(s.controlSize ?? 1)); tui.style.opacity = String(s.hudOpacity ?? 1); }
+  }
   sys.applySettings = () => {
     const s = save.state.settings;
     audio.setVolumes(s);
     { const t = s.timeOfDay === 'cycle' || !s.timeOfDay ? 'day' : s.timeOfDay; ctx.lighting?.setTimeMode?.(t === 'day' ? ({ b: 'dayB', c: 'dayC' }[s.daySun] ?? 'day') : t); } // (user r-daysun) Day Sun variant // (lighting2 r3) fixed preset (old saves: 'cycle' -> day)
     ctx.lighting?.setDryPuddles?.(s.puddles !== false); // (user r-nopuddles)
-    if (s.renderScale !== appliedScale) {
-      appliedScale = s.renderScale;
+    applyDisplay(s);
+    const effScale = s.renderScale * (s.upscaler ? 0.75 : 1); // Upscaler: render smaller, sharpen on top (see applyDisplay)
+    if (effScale !== appliedScale) {
+      appliedScale = effScale;
       if (appliedScale !== 1 || ctx.renderer.getPixelRatio() !== Math.min(devicePixelRatio, 1.5)) {
-        ctx.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5) * s.renderScale);
+        ctx.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5) * effScale);
         ctx.renderer.setSize(innerWidth, innerHeight); ctx.pipeline.setSize?.(innerWidth, innerHeight);
       }
     }
@@ -100,6 +124,7 @@ export function initSystems(ctx) {
   };
   if (save.state.settings.crimesOn === false) sys.crimes.enable(false);
   sys.applySettings();
+  if (!q.has('nomenu') && !q.has('playtest')) sys.mainMenu.show(); // title screen (Play hands over to flow mode 'play')
 
   // ---------------------------------------------------------------- progression feedback
   on('xp:gain', e => { ui.xp({ level: prog.level, xp: prog.xp, need: prog.need, gain: e.amount, leveled: e.leveled }); if (!e.leveled) audio.sfx.xp(); });

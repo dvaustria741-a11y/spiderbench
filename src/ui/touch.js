@@ -68,7 +68,7 @@ export function initTouch(ctx) {
   const held = new Set();
   const addBtn = (icon, code, size, right, bottom, extra = '') => {
     const b = document.createElement('div'); b.className = 'tb ' + extra;
-    if (!extra) b.style.cssText = `width:${size}px;height:${size}px;right:${SA(0, right, 'right')};bottom:${SA(0, bottom, 'bottom')}`;
+    if (!extra) b.style.cssText = `width:calc(${size}px * var(--tbs,1));height:calc(${size}px * var(--tbs,1));right:${SA(0, right, 'right')};bottom:${SA(0, bottom, 'bottom')}`;
     const im = document.createElement('img'); im.src = BASE + icon + '.png'; im.draggable = false; b.appendChild(im); root.appendChild(b);
     let id = null;
     b.addEventListener('pointerdown', e => { if (id !== null) return; id = e.pointerId; b.setPointerCapture(e.pointerId); b.classList.add('on'); fire('down', code); held.add(code); if (navigator.vibrate) navigator.vibrate(8); });

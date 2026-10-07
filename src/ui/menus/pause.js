@@ -6,6 +6,7 @@ import { createSuitsPage } from './suits.js';
 import { createSkillsPage } from './skills.js';
 import { createCollectiblesPage } from './collectibles.js';
 import { createSettingsPage } from './settings.js';
+import { createOptionsPanel } from './options.js';
 
 export function createPauseMenu(sys) {
   const { ui, audio, flow, prog, save } = sys;
@@ -22,6 +23,7 @@ export function createPauseMenu(sys) {
   const pages = [
     createMapPage(sys), createSuitsPage(sys), createSkillsPage(sys), createCollectiblesPage(sys),
     { id: 'photo', title: 'Photo Mode', action: () => { close(true); sys.photo.enter(); sys.photoUI.open(); } },
+    createOptionsPage(sys),
     createSettingsPage(sys),
   ];
   for (const p of pages) if (p.el) { p.el.classList.add('page'); body.appendChild(p.el); }
@@ -106,4 +108,10 @@ export function createPauseMenu(sys) {
     el, pages, show, close, get open() { return open; }, get tab() { return pages[cur]?.id; },
     update(dt) { pollPad(); if (open) pages[cur]?.update?.(dt); },
   };
+}
+
+// Options tab: the same screen as the main menu's (Game / Display / Graphics / Audio / Controls)
+function createOptionsPage(sys) {
+  const panel = createOptionsPanel(sys, {});
+  return { id: 'options', title: 'Options', el: panel.el, hints: [['Tap', 'Change']], footer: () => '', show() { panel.show(); }, back: () => panel.back() };
 }

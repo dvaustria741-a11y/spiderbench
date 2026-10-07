@@ -1025,7 +1025,7 @@ export async function createCrowd({ scene, blocks, parkPaths, props, roads, phas
   // (peds r1) user: 'reduce pedestrian density a bit' -> ~30 % fewer people on ordinary blocks, Times Square area stays busy
   let tsx = 0, tsz = 0; for (const sp of tsCrowdSpots) { tsx += sp.x; tsz += sp.z; } if (tsCrowdSpots.length) { tsx /= tsCrowdSpots.length; tsz /= tsCrowdSpots.length; }
   // (peds r6) user: 'reduce people by 10 % more' -> x0.9 everywhere (TS stays proportionally busier)
-  const densAt = (x, z) => 0.9 * (0.66 + 0.3 * (tsCrowdSpots.length ? Math.exp(-(((x - tsx) ** 2 + (z - tsz) ** 2) / (260 * 260))) : 0));
+  const densAt = (x, z) => (globalThis.__POP_SCALE ?? 1) * 0.9 * (0.66 + 0.3 * (tsCrowdSpots.length ? Math.exp(-(((x - tsx) ** 2 + (z - tsz) ** 2) / (260 * 260))) : 0));
   const populate = (b) => {
     if (b.vmap) { populateV(b); declone(b.agents); return; } // (layout2 r3) ((peds r2) anti-clone)
     const r = mulberry32(b.id * 7349 + 17);

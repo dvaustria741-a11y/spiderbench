@@ -112,7 +112,10 @@ if (shotName) {
   // tools (tools/film.mjs): ctx.manualStep = true pauses the real-time loop; ctx.stepFrame(dt) then advances exactly one
   // frame of dt seconds (deterministic frame-by-frame captures of fast motion)
   ctx.stepFrame = dt => frame(dt);
+  let lastDraw = 0;
   renderer.setAnimationLoop(() => {
+    // Options > Display > Frame Rate: ctx.fpsCap (0 = every display refresh)
+    if (ctx.fpsCap) { const now = performance.now(); if (now - lastDraw < 1000 / ctx.fpsCap - 2) return; lastDraw = now; }
     const d = Math.min(clock.getDelta(), 1 / 20);
     if (!ctx.manualStep) frame(d);
   });

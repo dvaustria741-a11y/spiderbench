@@ -12,6 +12,9 @@ export const DEFAULT_SETTINGS = {
   showPins: true, minimalHud: false, subtitles: true, fovOffset: 0, motionBlur: 1, dof: 1, hudScale: 1, subtitleSize: 1,
   timeOfDay: 'day', // (lighting2 r3) fixed preset: day | morning | sunrise | sunset | dusk | night | overcast
   puddles: true, // (user r-nopuddles) water / wet patches on the ground in dry weather (rain always wets the streets)
+  // options screen (Display / Controls); gfx (Graphics) stays unset until the player touches it, see render/gfxprefs.js
+  displayPreset: 'default', brightness: 0.5, contrast: 0.5, saturation: 0.5, sharpness: 0.5, upscaler: false, frameRate: 'max',
+  controlSize: 1, hudOpacity: 1,
   daySun: 'a', // (user r-daysun) Day preset sun direction: a (midday, SSW) | b (late morning, SE) | c (afternoon, WSW)
 };
 

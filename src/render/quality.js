@@ -1,4 +1,5 @@
 // OWNER: render agent. Quality presets selected with ?q=low|med|high (default high).
+import { readGfx, applyGfxToQuality } from './gfxprefs.js';
 const PRESETS = {
   low: {
     name: 'low',
@@ -40,6 +41,8 @@ export function getQuality() {
     if (p === 'medium') name = 'med';
   } catch (e) { /* non-browser */ }
   _q = { ...PRESETS[name] };
+  // options screen (Graphics): saved per-feature choices win over the preset
+  try { if (!new URLSearchParams(location.search).has('nogfxprefs')) applyGfxToQuality(_q, readGfx()); } catch (e) { /* non-browser */ }
   // (perf) ?perfoff disables the perf agent's culling / batching changes (A/B measurements with tools/perf_probe.mjs)
   try { _q.perf = !new URLSearchParams(location.search).has('perfoff'); } catch (e) { _q.perf = true; }
   // (perf r2) ?qset=ao:0,ssr:0,shadowMapSize:1024 overrides single preset fields (GPU ablation with tools/perf_probe.mjs)
