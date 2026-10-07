@@ -38,8 +38,8 @@ export function createMainMenu(sys, ctx) {
   const optsHost = $('.opts');
   const options = createOptionsPanel(sys, { onClose: closeOptions });
   optsHost.appendChild(options.el);
-  function openOptions() { audio.sfx.select(); options.show(); optsHost.classList.add('on'); }
-  function closeOptions() { optsHost.classList.remove('on'); audio.sfx.close?.(); }
+  function openOptions() { audio.sfx.select(); options.show(); optsHost.classList.add('on'); ctx.menuStill = true; }
+  function closeOptions() { optsHost.classList.remove('on'); ctx.menuStill = false; ctx.pipeline.resetHistory?.(); audio.sfx.close?.(); }
 
   // ---- info modals
   const info = $('.info'), box = info.querySelector('.box');

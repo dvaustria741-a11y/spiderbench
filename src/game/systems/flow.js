@@ -71,6 +71,7 @@ export function createFlow(ctx, { save }) {
     setMode, clearInput,
     set overlay(v) { overlay = !!v; }, get overlay() { return overlay; },
     setCameraHook(fn) { cameraHook = fn; },
+    get hasCameraHook() { return !!cameraHook; },
     onKey(fn) { keyHandlers.push(fn); return () => { const i = keyHandlers.indexOf(fn); if (i >= 0) keyHandlers.splice(i, 1); }; },
   };
 }

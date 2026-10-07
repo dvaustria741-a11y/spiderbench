@@ -103,6 +103,12 @@ if (shotName) {
   const clock = new THREE.Clock();
   function frame(realDt) {
     ctx.realDt = realDt;
+    const fl = ctx.flow;
+    if (fl && fl.mode === 'menu' && (ctx.menuStill || (!ctx.menuActive && !fl.hasCameraHook && !document.querySelector('.sys-menu.open.see-through')))) {
+      // pause menu pages / main-menu Options: nothing to see behind the UI, so skip the whole 3D frame
+      for (const s of ctx.systems) s.update?.(realDt);
+      return;
+    }
     const dt = ctx.realDt * (ctx.timeScale ?? 1);
     const t0 = performance.now();
     player.update(dt); world.update(dt, camera); lighting.update(camera); hud.update(dt);
@@ -120,7 +126,7 @@ if (shotName) {
   let lastDraw = 0;
   renderer.setAnimationLoop(() => {
     // Options > Display > Frame Rate: ctx.fpsCap (0 = every display refresh)
-    const cap = ctx.menuActive ? (ctx.fpsCap && ctx.fpsCap < 30 ? ctx.fpsCap : 30) : ctx.fpsCap; // title screen: 30 fps max
+    const cap = ctx.menuActive ? 20 : ctx.fpsCap; // title screen: 20 fps is plenty for a slowly turning hero
     if (cap) { const now = performance.now(); if (now - lastDraw < 1000 / cap - 2) return; lastDraw = now; }
     const d = Math.min(clock.getDelta(), 1 / 20);
     if (!ctx.manualStep) frame(d);
