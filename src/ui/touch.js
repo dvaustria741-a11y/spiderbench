@@ -1,16 +1,19 @@
-// On-screen touch controls (Android APK / phones). Left stick = move, right-side drag = camera,
-// buttons dispatch the same key / mouse events the keyboard + mouse layout uses (see player/input.js).
+// On-screen touch controls (Android APK / phones). Icon-only buttons (white pose silhouettes, no circles),
+// left side = move stick, drag the right side = camera. Buttons dispatch the same key / mouse events the
+// keyboard + mouse layout uses (see player/input.js).
 const MOUSE = { MouseLeft: 0, MouseMiddle: 1, MouseRight: 2 };
+const BASE = (import.meta.env?.BASE_URL || '/') + 'assets/ui/touch/';
+const SA = (side, v, edge) => `calc(${v}px + env(safe-area-inset-${edge}))`;
+// icon, key/mouse code, size px, right offset, bottom offset (px, from the safe area)
 const BUTTONS = [
-  // label, code, hold?, css position
-  ['SWING', 'MouseRight', true, 'right:calc(24px + env(safe-area-inset-right));bottom:calc(150px + env(safe-area-inset-bottom));width:84px;height:84px'],
-  ['JUMP', 'Space', true, 'right:calc(120px + env(safe-area-inset-right));bottom:calc(36px + env(safe-area-inset-bottom));width:84px;height:84px'],
-  ['ZIP', 'KeyE', false, 'right:calc(24px + env(safe-area-inset-right));bottom:calc(40px + env(safe-area-inset-bottom));width:66px;height:66px'],
-  ['RUN', 'ShiftLeft', true, 'right:calc(220px + env(safe-area-inset-right));bottom:calc(36px + env(safe-area-inset-bottom));width:60px;height:60px'],
-  ['DIVE', 'KeyC', false, 'right:calc(120px + env(safe-area-inset-right));bottom:calc(136px + env(safe-area-inset-bottom));width:60px;height:60px'],
-  ['BOOST', 'KeyQ', false, 'right:calc(200px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:60px;height:60px'],
-  ['HIT', 'MouseLeft', true, 'right:calc(24px + env(safe-area-inset-right));bottom:calc(240px + env(safe-area-inset-bottom));width:66px;height:66px'],
-  ['WEB', 'KeyF', false, 'right:calc(110px + env(safe-area-inset-right));bottom:calc(230px + env(safe-area-inset-bottom));width:52px;height:52px'],
+  ['swing',   'MouseRight', 104,  22, 118],
+  ['jump',    'Space',      112, 136,  18],
+  ['zip',     'KeyE',        80,  22,  18],
+  ['wallrun', 'ShiftLeft',   84, 262,  20],
+  ['dive',    'KeyC',        72, 150, 136],
+  ['boost',   'KeyQ',        76, 236, 118],
+  ['punch',   'MouseLeft',   84,  22, 232],
+  ['web',     'KeyF',        72, 120, 244],
 ];
 
 export function initTouch(ctx) {
@@ -19,12 +22,14 @@ export function initTouch(ctx) {
   root.id = 'touch-ui';
   root.style.cssText = 'position:fixed;inset:0;z-index:50;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none';
   const css = document.createElement('style');
-  css.textContent = `#touch-ui .tb{position:absolute;pointer-events:auto;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(20,20,30,.38);color:#fff;font:700 11px/1 system-ui,sans-serif;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;touch-action:none}
-#touch-ui .tb.on{background:rgba(220,40,50,.6)}
-#touch-ui .pad{position:absolute;pointer-events:auto;touch-action:none;left:calc(28px + env(safe-area-inset-left));bottom:calc(36px + env(safe-area-inset-bottom));width:150px;height:150px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(20,20,30,.25)}
-#touch-ui .knob{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(255,255,255,.45)}
+  css.textContent = `#touch-ui .tb{position:absolute;pointer-events:auto;touch-action:none;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+#touch-ui .tb img{width:100%;height:100%;object-fit:contain;opacity:.82;pointer-events:none;filter:drop-shadow(0 0 3px rgba(0,0,0,.75));transition:transform .06s,opacity .06s}
+#touch-ui .tb.on img{opacity:1;transform:scale(.88);filter:drop-shadow(0 0 3px rgba(0,0,0,.75)) drop-shadow(0 0 8px rgba(255,255,255,.9))}
+#touch-ui .pad{position:absolute;pointer-events:auto;touch-action:none;left:calc(28px + env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));width:160px;height:160px}
+#touch-ui .ring{position:absolute;inset:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.18)}
+#touch-ui .knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.28)}
 #touch-ui .look{position:absolute;pointer-events:auto;touch-action:none;left:38%;right:0;top:0;bottom:0}
-#touch-ui .menu{top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));width:44px;height:44px}`;
+#touch-ui .menu{left:calc(14px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));width:46px;height:46px}`;
   document.head.appendChild(css);
 
   const fire = (type, code) => {
@@ -41,13 +46,14 @@ export function initTouch(ctx) {
   const lookEnd = e => { if (e.pointerId === lookId) lookId = null; };
   look.addEventListener('pointerup', lookEnd); look.addEventListener('pointercancel', lookEnd);
 
-  // move stick
+  // move stick (nearly invisible: faint ring + soft knob)
   const pad = document.createElement('div'); pad.className = 'pad';
+  const ring = document.createElement('div'); ring.className = 'ring'; pad.appendChild(ring);
   const knob = document.createElement('div'); knob.className = 'knob'; pad.appendChild(knob); root.appendChild(pad);
   let padId = null;
   const setStick = e => {
-    const r = pad.getBoundingClientRect(), R = r.width / 2;
-    let dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R);
+    const r = pad.getBoundingClientRect(), R = r.width / 2 - 18;
+    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
     const len = Math.hypot(dx, dy); if (len > R) { dx = dx / len * R; dy = dy / len * R; }
     knob.style.transform = `translate(${dx}px,${dy}px)`;
     input.touch.mx = dx / R; input.touch.my = -dy / R;
@@ -58,17 +64,19 @@ export function initTouch(ctx) {
   pad.addEventListener('pointerup', e => { if (e.pointerId === padId) resetStick(); });
   pad.addEventListener('pointercancel', e => { if (e.pointerId === padId) resetStick(); });
 
-  // action buttons
+  // icon buttons
   const held = new Set();
-  const addBtn = (label, code, hold, pos, extra = '') => {
-    const b = document.createElement('div'); b.className = 'tb ' + extra; b.textContent = label; b.style.cssText = pos; root.appendChild(b);
-    const id = { v: null };
-    b.addEventListener('pointerdown', e => { if (id.v !== null) return; id.v = e.pointerId; b.setPointerCapture(e.pointerId); b.classList.add('on'); fire('down', code); held.add(code); if (navigator.vibrate) navigator.vibrate(8); });
-    const end = e => { if (e.pointerId !== id.v) return; id.v = null; b.classList.remove('on'); fire('up', code); held.delete(code); };
+  const addBtn = (icon, code, size, right, bottom, extra = '') => {
+    const b = document.createElement('div'); b.className = 'tb ' + extra;
+    if (!extra) b.style.cssText = `width:${size}px;height:${size}px;right:${SA(0, right, 'right')};bottom:${SA(0, bottom, 'bottom')}`;
+    const im = document.createElement('img'); im.src = BASE + icon + '.png'; im.draggable = false; b.appendChild(im); root.appendChild(b);
+    let id = null;
+    b.addEventListener('pointerdown', e => { if (id !== null) return; id = e.pointerId; b.setPointerCapture(e.pointerId); b.classList.add('on'); fire('down', code); held.add(code); if (navigator.vibrate) navigator.vibrate(8); });
+    const end = e => { if (e.pointerId !== id) return; id = null; b.classList.remove('on'); fire('up', code); held.delete(code); };
     b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end);
   };
-  for (const [l, c, h, p] of BUTTONS) addBtn(l, c, h, p);
-  addBtn('II', 'Escape', false, '', 'menu');
+  for (const [icon, code, size, r, b] of BUTTONS) addBtn(icon, code, size, r, b);
+  addBtn('pause', 'Escape', 46, 0, 0, 'menu');
 
   document.body.appendChild(root);
   ['contextmenu', 'gesturestart', 'dblclick'].forEach(t => root.addEventListener(t, e => e.preventDefault()));
