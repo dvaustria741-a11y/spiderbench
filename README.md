@@ -25,3 +25,10 @@ Controls are listed in-game (press **H**). On the dev server, **~** opens a deve
 This is an unofficial fan project, made only as a technical demonstration. It is not affiliated with, endorsed by or sponsored by Marvel, Disney, Sony or Insomniac Games. Spider-Man and related names, characters and likenesses are trademarks and copyrighted material of their respective owners, and no rights to them are claimed. **This project is not for sale and may not be redistributed or used commercially.** See [LICENSE](LICENSE).
 
 Bundled fonts are under the SIL Open Font License; see `public/assets/ui/fonts/`.
+
+## Android (APK)
+
+The game is wrapped with Capacitor and gets on-screen touch controls on phones (left stick = move, drag right side = camera, buttons for swing / jump / zip / dive / boost / run / hit / web). Quality defaults to `low` on touch devices.
+
+- **CI:** `.github/workflows/android-apk.yml` builds a debug APK on every push to `main` (download it from the run's **Artifacts**), and attaches it to a GitHub Release when you push a `v*` tag.
+- **Local:** `npm run build && npx cap sync android && cd android && ./gradlew assembleDebug`

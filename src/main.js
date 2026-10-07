@@ -66,6 +66,7 @@ addEventListener('resize', () => {
 const ctx = { THREE, renderer, scene, camera, lighting, world, player, hud, pipeline, input };
 ctx.systems = ctx.systems || []; // C5: game systems (src/game/**) push {update(dt)} here
 window.__ctx = ctx;
+if (matchMedia('(pointer: coarse)').matches || params.has('touch')) import('./ui/touch.js').then(m => m.initTouch(ctx)).catch(e => console.error('[touch] init failed', e));
 // (perf r3) queue every shader program the game can draw (main pass + the river mirror's unshadowed variant + the
 // post passes) before the first frame: they link in parallel on the driver's threads during the loading frame instead
 // of one by one later, each freezing the game for 0.2-6 s the first time its material came into view

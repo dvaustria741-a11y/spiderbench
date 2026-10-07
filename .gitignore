@@ -1,3 +1,9 @@
 node_modules/
 dist/
 .DS_Store
+android/app/build/
+android/build/
+android/.gradle/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor*.json
+android/capacitor-cordova-android-plugins/

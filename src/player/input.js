@@ -23,6 +23,7 @@ export function createInput(el) {
   const keys = new Set(); const tapped = new Set(); // tapped: keys pressed since last poll (latched so short taps are never lost)
   const mouse = { dx: 0, dy: 0, buttons: 0 };
   const synthetic = new Set();
+  const touch = { mx: 0, my: 0 }; // on-screen joystick (ui/touch.js), analog -1..1
   const isTyping = e => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '');
   addEventListener('keydown', e => {
     if (isTyping(e)) return;
@@ -73,6 +74,7 @@ export function createInput(el) {
     if (has('KeyS') || has('ArrowDown')) my -= 1;
     if (has('KeyD') || has('ArrowRight')) mx += 1;
     if (has('KeyA') || has('ArrowLeft')) mx -= 1;
+    mx += touch.mx; my += touch.my;
     let lx = mouse.dx, ly = mouse.dy; mouse.dx = mouse.dy = 0;
     let btn = mouse.buttons | tappedBtn.v; tappedBtn.v = 0;
     for (const [k, b] of Object.entries(BTN)) if (synthetic.has(k)) btn |= b;
@@ -115,7 +117,8 @@ export function createInput(el) {
   }
 
   return {
-    keys, mouse, state, poll, sling,
+    keys, mouse, state, poll, sling, touch,
+    touchLook(dx, dy) { mouse.dx += dx; mouse.dy += dy; },
     press(code) { synthetic.add(code); }, release(code) { synthetic.delete(code); }, releaseAll() { synthetic.clear(); },
     consumeMouse() { const r = { dx: mouse.dx, dy: mouse.dy }; mouse.dx = mouse.dy = 0; return r; },
   };

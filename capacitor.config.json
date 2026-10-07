@@ -1,0 +1,8 @@
+{
+  "appId": "com.spiderbench.mobile",
+  "appName": "Spiderbench",
+  "webDir": "dist",
+  "backgroundColor": "#000000",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}

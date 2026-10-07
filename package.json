@@ -8,11 +8,14 @@
     "preview": "vite preview --port 4173 --host 127.0.0.1"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/core": "^7.6.9",
     "n8ao": "^2.0.1",
     "postprocessing": "^6.39.5",
     "three": "^0.186.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
     "vite": "^8.3.0"
   }
 }
