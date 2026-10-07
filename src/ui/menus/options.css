@@ -51,7 +51,8 @@
 .mm .ico svg, .mm .ico img { width: 100%; height: 100%; }
 .mm .chip { min-width: 190px; padding: 8px 18px; border-radius: 8px; background: #fff; color: #222; display: flex; align-items: center; gap: 12px; font: 700 17px/1.15 var(--sys-body); }
 .mm .chip small { display: block; font: 600 16px var(--sys-body); color: #777; }
-.mm .chip svg { width: 36px; height: 36px; flex: none; }
+.mm .chip .av { width: 40px; height: 40px; flex: none; display: block; }
+.mm .chip .av img, .mm .chip .av svg { width: 100%; height: 100%; display: block; }
 .mm .acts { position: absolute; right: max(26px, env(safe-area-inset-right)); top: 50%; transform: translateY(-46%); display: flex; align-items: center; gap: 22px; }
 .mm .sq { width: clamp(84px, 17vh, 118px); aspect-ratio: 1; border: 0; border-radius: 10px; background: rgba(60, 60, 60, .82); display: flex; align-items: center; justify-content: center; position: relative; backdrop-filter: blur(4px); }
 .mm .sq.big { width: clamp(118px, 25vh, 160px); background: rgba(70, 66, 64, .88); }
