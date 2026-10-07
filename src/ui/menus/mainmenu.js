@@ -32,7 +32,7 @@ export function createMainMenu(sys, ctx) {
   };
   art($('[data-a=suits]'), 'profile'); art($('[data-a=photo]'), 'photo'); art($('[data-a=news]'), 'news');
   art($('[data-a=profile]'), 'profile'); art($('[data-a=play]'), 'play'); art($('[data-a=options]'), 'options'); art($('.chip .av'), 'user');
-  { const lg = $('.logo'); const im = new Image(); im.alt = 'Spiderbench'; im.src = BASE + 'logo.png'; im.onerror = () => { lg.innerHTML = '<b>SPIDERBENCH<i>.</i></b><small>MANHATTAN</small>'; }; lg.appendChild(im); }
+  { const lg = $('.logo'); const im = new Image(); im.alt = 'Spiderbench'; im.src = BASE + 'logo.png'; im.onerror = () => { lg.innerHTML = '<b>SPIDERBENCH<i>.</i></b>'; }; lg.appendChild(im); }
 
   // ---- options (full-screen panel inside the menu)
   const optsHost = $('.opts');
