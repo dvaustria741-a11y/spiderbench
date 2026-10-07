@@ -53,6 +53,7 @@ export function createOptionsPanel(sys, { onClose } = {}) {
   const PAGES = {
     game: [
       cho('timeOfDay', 'Time of Day', [['day', 'Day'], ['morning', 'Morning'], ['sunrise', 'Sunrise'], ['sunset', 'Sunset'], ['dusk', 'Dusk'], ['night', 'Night'], ['overcast', 'Overcast']], 'Hand-tuned lighting for the whole city.'),
+      cho('showFps', 'Show FPS', [[false, 'Off'], [true, 'On']], 'Frame rate, update time, render time, draw calls and memory counts in the corner. Useful for finding what is slow.'),
       cho('puddles', 'Puddles', [[true, 'On'], [false, 'Off']], 'Wet patches on the ground in dry weather.'),
       cho('crimes', 'Random Crimes', [[true, 'On'], [false, 'Off']], 'Street crimes are reported while you explore.', { crimes: true }),
       cho('showPins', 'World Markers', [[true, 'On'], [false, 'Off']], 'On-screen icons for towers, crimes and collectibles.'),

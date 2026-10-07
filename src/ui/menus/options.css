@@ -54,7 +54,7 @@
 .mm .chip .av { width: 40px; height: 40px; flex: none; display: block; }
 .mm .chip .av img, .mm .chip .av svg { width: 100%; height: 100%; display: block; }
 .mm .acts { position: absolute; right: max(26px, env(safe-area-inset-right)); top: 50%; transform: translateY(-46%); display: flex; align-items: center; gap: 22px; }
-.mm .sq { width: clamp(84px, 17vh, 118px); aspect-ratio: 1; border: 0; border-radius: 10px; background: rgba(60, 60, 60, .82); display: flex; align-items: center; justify-content: center; position: relative; backdrop-filter: blur(4px); }
+.mm .sq { width: clamp(84px, 17vh, 118px); aspect-ratio: 1; border: 0; border-radius: 10px; background: rgba(60, 60, 60, .82); display: flex; align-items: center; justify-content: center; position: relative; }
 .mm .sq.big { width: clamp(118px, 25vh, 160px); background: rgba(70, 66, 64, .88); }
 .mm .sq svg, .mm .sq img { width: 56%; height: 56%; }
 .mm .sq:active { background: rgba(227, 38, 47, .75); transform: scale(.96); }

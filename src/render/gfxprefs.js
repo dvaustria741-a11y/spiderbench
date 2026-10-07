@@ -9,7 +9,7 @@ export const LIVE_FIELDS = ['bloom', 'traffic'];
 
 // per-preset values for every field (Low / Medium / High); a settings.gfx that matches none of them is "Custom"
 export const GFX_PRESETS = {
-  low:    { shadows: 'low',    shadowRes: 'low',    shadowDist: 'low',    aa: 'on', ao: 'off',  reflections: 'off',  gi: 'off', shafts: 'off', clouds: 'low',    population: 'low',    drawDist: 'low',    bloom: 'on', traffic: 'low' },
+  low:    { shadows: 'low',    shadowRes: 'low',    shadowDist: 'low',    aa: 'off', ao: 'off',  reflections: 'off',  gi: 'off', shafts: 'off', clouds: 'low',    population: 'low',    drawDist: 'low',    bloom: 'on', traffic: 'low' },
   medium: { shadows: 'medium', shadowRes: 'medium', shadowDist: 'medium', aa: 'on', ao: 'low',  reflections: 'low',  gi: 'on',  shafts: 'on',  clouds: 'medium', population: 'medium', drawDist: 'medium', bloom: 'on', traffic: 'medium' },
   high:   { shadows: 'high',   shadowRes: 'high',   shadowDist: 'high',   aa: 'on', ao: 'high', reflections: 'high', gi: 'on',  shafts: 'on',  clouds: 'high',   population: 'high',   drawDist: 'full',   bloom: 'on', traffic: 'high' },
 };

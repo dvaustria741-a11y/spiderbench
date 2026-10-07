@@ -95,7 +95,7 @@ export function createHud({ player, world, camera }) {
   const debug = new URLSearchParams(location.search).has('debug');
   const shotMode = new URLSearchParams(location.search).has('shot');
   const reticle = shotMode ? null : createReticle(root);
-  let helpT = 0, helpOn = !new URLSearchParams(location.search).get('shot');
+  let helpT = 0, helpOn = !new URLSearchParams(location.search).get('shot') && !matchMedia('(pointer: coarse)').matches; // the keyboard help is PC-only
   // help: shown for the first 30 s of play, then collapsed; H toggles it (a manual show stays until H again)
   let helpManual = false;
   addEventListener('keydown', e => { if (e.code === 'KeyH') { helpOn = !helpOn; helpT = 0; helpManual = helpOn; } });

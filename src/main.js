@@ -64,6 +64,7 @@ addEventListener('resize', () => {
 });
 
 const ctx = { THREE, renderer, scene, camera, lighting, world, player, hud, pipeline, input };
+import('./ui/perf.js').then(m => m.initPerf(ctx)).catch(() => {});
 ctx.systems = ctx.systems || []; // C5: game systems (src/game/**) push {update(dt)} here
 window.__ctx = ctx;
 if (matchMedia('(pointer: coarse)').matches || params.has('touch')) import('./ui/touch.js').then(m => m.initTouch(ctx)).catch(e => console.error('[touch] init failed', e));
@@ -103,9 +104,13 @@ if (shotName) {
   function frame(realDt) {
     ctx.realDt = realDt;
     const dt = ctx.realDt * (ctx.timeScale ?? 1);
+    const t0 = performance.now();
     player.update(dt); world.update(dt, camera); lighting.update(camera); hud.update(dt);
     for (const s of ctx.systems) s.update?.(dt);
+    const t1 = performance.now();
     pipeline.render(dt);
+    const t2 = performance.now(); const P = ctx.perf || (ctx.perf = { upd: 0, rnd: 0, frame: 0 });
+    P.upd += (t1 - t0 - P.upd) * 0.1; P.rnd += (t2 - t1 - P.rnd) * 0.1; P.frame += (realDt * 1000 - P.frame) * 0.1;
     warmup?.step(); // (perf r3)
     if (++framesDrawn === 1) boot.sub(0.4); // the first frame (remaining uploads / links) is in
   }
