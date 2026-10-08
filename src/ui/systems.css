@@ -463,3 +463,11 @@ body.ui-minimal #hud > :not(.mm-wrap),
 body.ui-minimal #sys-root > :is(.sys-banner, .sys-crime, .sys-obj, .sys-pins, .sys-prompt, .sys-sub, .sys-toasts, .sys-xp),
 body.ui-minimal #cmb-hud,
 body.ui-minimal .zip-reticle { display: none !important; }
+
+/* touch: footer hints and Q / E are tap targets; Resume is a real button */
+.sys-menu .tabs .qe, .sys-menu .foot .hints > span[data-k] { cursor: pointer; }
+@media (pointer: coarse) {
+  .sys-menu .foot .hints > span[data-k] { padding: 12px 16px; margin: -12px 0; }
+  .sys-menu .foot .hints > span.resume { background: #e3262f; border-radius: 10px; color: #fff; padding: 12px 22px; font-weight: 800; }
+  .sys-menu .tabs .qe { padding: 12px 10px; }
+}

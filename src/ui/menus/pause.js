@@ -29,6 +29,13 @@ export function createPauseMenu(sys) {
   for (const p of pages) if (p.el) { p.el.classList.add('page'); body.appendChild(p.el); }
   tabsEl.innerHTML = pages.map((p, i) => `<span class="tab" data-i="${i}">${p.title}</span>`).join('');
   const tabEls = [...tabsEl.querySelectorAll('.tab')];
+  // touch: the key hints are buttons (Esc = Resume, C = Center ...) and Q / E flip tabs
+  hintsEl.addEventListener('click', e => {
+    const k = e.target.closest('[data-k]')?.dataset.k; if (!k) return;
+    if (k === 'Esc') { close(); return; }
+    if (/^[A-Za-z]$/.test(k)) { const code = 'Key' + k.toUpperCase(); document.dispatchEvent(new KeyboardEvent('keydown', { code, key: k, bubbles: true })); document.dispatchEvent(new KeyboardEvent('keyup', { code, key: k, bubbles: true })); }
+  });
+  el.querySelectorAll('.qe').forEach((q, i) => q.addEventListener('click', () => step(i === 0 ? -1 : 1)));
   tabEls.forEach((t, i) => { t.addEventListener('click', () => select(i)); t.addEventListener('mouseenter', () => audio.sfx.hover()); });
 
   let open = false, cur = -1, last = 0;
@@ -49,7 +56,7 @@ export function createPauseMenu(sys) {
     cur = i; last = i; p.el.classList.add('on'); p.el.classList.remove('from-left');
     tabEls.forEach((t, k) => t.classList.toggle('on', k === i));
     el.classList.toggle('see-through', !!p.seeThrough);
-    hintsEl.innerHTML = (p.hints || []).map(([k, t]) => `<span><span class="sys-key">${k}</span>${t}</span>`).join('') + '<span><span class="sys-key">Esc</span>Resume</span>';
+    hintsEl.innerHTML = (p.hints || []).map(([k, t]) => `<span data-k="${k}"><span class="sys-key">${k}</span>${t}</span>`).join('') + '<span data-k="Esc" class="resume"><span class="sys-key">Esc</span>Resume</span>';
     leftEl.textContent = p.footer?.() || '';
     p.show?.();
     if (!silent) audio.sfx.move();
