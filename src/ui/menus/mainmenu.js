@@ -38,6 +38,13 @@ export function createMainMenu(sys, ctx) {
   const optsHost = $('.opts');
   const options = createOptionsPanel(sys, { onClose: closeOptions });
   optsHost.appendChild(options.el);
+  // Suits straight from the title screen: the same page as the pause menu's Suits tab, with the other tabs hidden
+  let returnToMenu = false;
+  function openSuits() {
+    if (!active) return; audio.sfx.select(); returnToMenu = true; active = false; el.classList.remove('on');
+    sys.pause.el.classList.add('from-main'); sys.pause.show('suits');
+  }
+  sys.events.on('pause:closed', () => { if (!returnToMenu) return; returnToMenu = false; sys.pause.el.classList.remove('from-main'); show(); });
   function openOptions() { audio.sfx.select(); options.show(); optsHost.classList.add('on'); ctx.menuStill = true; }
   function closeOptions() { optsHost.classList.remove('on'); ctx.menuStill = false; ctx.pipeline.resetHistory?.(); audio.sfx.close?.(); }
 
@@ -141,8 +148,8 @@ export function createMainMenu(sys, ctx) {
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a;
-    if (a === 'play') play(); else if (a === 'options') openOptions(); else if (a === 'profile') { audio.sfx.select(); profile(); } else if (a === 'news') { audio.sfx.select(); about(); }
-    else if (a === 'suits' || a === 'photo') { audio.sfx.select(); modal(`<h3>${a === 'suits' ? 'Suits' : 'Photo Mode'}</h3><p>Press Play, then open the pause menu (Esc, or the pause button on a phone) to use ${a === 'suits' ? 'the Suits tab' : 'Photo Mode'}.</p>`); }
+    if (a === 'play') play(); else if (a === 'options') openOptions(); else if (a === 'profile') openSuits(); else if (a === 'suits') { audio.sfx.select(); profile(); } else if (a === 'news') { audio.sfx.select(); about(); }
+    else if (a === 'photo') { audio.sfx.select(); modal(`<h3>${a === 'suits' ? 'Suits' : 'Photo Mode'}</h3><p>Press Play, then open the pause menu (Esc, or the pause button on a phone) to use ${a === 'suits' ? 'the Suits tab' : 'Photo Mode'}.</p>`); }
   });
   for (const b of el.querySelectorAll('[data-a]')) b.addEventListener('mouseenter', () => audio.sfx.hover());
 

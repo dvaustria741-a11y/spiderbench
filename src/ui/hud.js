@@ -17,7 +17,7 @@ function css() {
   #hud{position:fixed;inset:0;pointer-events:none;font-family:Rajdhani,'Barlow Condensed','Arial Narrow',sans-serif;color:#fff;z-index:10;transition:opacity .4s}
   #hud.hidden{opacity:0}
   .mm-wrap{position:absolute;right:2.4vw;bottom:1.9vh;width:15.6vw;min-width:190px;perspective:700px}
-  .mm{position:relative;transform:rotateY(-12deg) rotateX(6deg) skewY(-1.5deg);transform-origin:100% 100%}
+  .mm-wrap .mm{position:relative;transform:rotateY(-12deg) rotateX(6deg) skewY(-1.5deg);transform-origin:100% 100%}
   .mm-compass{position:relative;height:2.1vw;min-height:26px;overflow:hidden;
     background:linear-gradient(180deg,rgba(18,30,60,.55),rgba(18,30,60,.25));border-top:1px solid rgba(190,210,255,.55);
     clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}

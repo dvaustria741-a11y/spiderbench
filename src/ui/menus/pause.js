@@ -33,6 +33,7 @@ export function createPauseMenu(sys) {
   hintsEl.addEventListener('click', e => {
     const k = e.target.closest('[data-k]')?.dataset.k; if (!k) return;
     if (k === 'Esc') { close(); return; }
+    if (k === 'menu') { close(); sys.mainMenu?.show?.(); return; } // back to the title screen (the game keeps running state; Play resumes it)
     if (/^[A-Za-z]$/.test(k)) { const code = 'Key' + k.toUpperCase(); document.dispatchEvent(new KeyboardEvent('keydown', { code, key: k, bubbles: true })); document.dispatchEvent(new KeyboardEvent('keyup', { code, key: k, bubbles: true })); }
   });
   el.querySelectorAll('.qe').forEach((q, i) => q.addEventListener('click', () => step(i === 0 ? -1 : 1)));
@@ -56,7 +57,7 @@ export function createPauseMenu(sys) {
     cur = i; last = i; p.el.classList.add('on'); p.el.classList.remove('from-left');
     tabEls.forEach((t, k) => t.classList.toggle('on', k === i));
     el.classList.toggle('see-through', !!p.seeThrough);
-    hintsEl.innerHTML = (p.hints || []).map(([k, t]) => `<span data-k="${k}"><span class="sys-key">${k}</span>${t}</span>`).join('') + '<span data-k="Esc" class="resume"><span class="sys-key">Esc</span>Resume</span>';
+    hintsEl.innerHTML = (p.hints || []).map(([k, t]) => `<span data-k="${k}"><span class="sys-key">${k}</span>${t}</span>`).join('') + '<span data-k="Esc" class="resume"><span class="sys-key">Esc</span>Resume</span><span data-k="menu" class="tomenu"><span class="sys-key">Menu</span>Main menu</span>';
     leftEl.textContent = p.footer?.() || '';
     p.show?.();
     if (!silent) audio.sfx.move();
@@ -74,6 +75,7 @@ export function createPauseMenu(sys) {
     el.classList.remove('open', 'see-through'); audio.setPaused(false); if (!toPhoto) ui.setVisible(true);
     if (!toPhoto) { audio.sfx.close(); flow.setMode('play'); }
     window.__sysMenu = { open: false };
+    sys.events.emit?.('pause:closed', { toPhoto });
   }
   function step(d) { let i = cur; do { i = (i + d + pages.length) % pages.length; } while (pages[i].action); select(i); }
 
