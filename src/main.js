@@ -133,7 +133,7 @@ if (shotName) {
   let lastDraw = 0;
   renderer.setAnimationLoop(() => {
     // Options > Display > Frame Rate: ctx.fpsCap (0 = every display refresh)
-    const cap = ctx.menuActive ? 20 : ctx.fpsCap; // title screen: 20 fps is plenty for a slowly turning hero
+    const cap = ctx.menuActive ? 0 : ctx.fpsCap; // title screen: uncapped (it only draws the hero + sky, ~5 ms); gameplay follows Options > Display > Frame Rate
     if (cap) { const now = performance.now(); if (now - lastDraw < 1000 / cap - 2) return; lastDraw = now; }
     const raw = clock.getDelta(); ctx.rawDt = raw; // unclamped, for the FPS readout
     const d = Math.min(raw, 1 / 20);
