@@ -15,7 +15,7 @@ export function initPerf(ctx) {
     const pr0 = ctx.renderer.getPixelRatio();
     const tests = [
       ['base', () => {}, () => {}],
-      ['no city', () => { city.visible = false; }, () => { city.visible = true; }],
+      ['no city', () => { city._was = city.visible; city.visible = false; }, () => { city.visible = city._was; }],
       ['no sim', () => { ctx.benchNoWorld = true; }, () => { ctx.benchNoWorld = false; }],
       ['no post', () => { ctx.benchDirect = true; }, () => { ctx.benchDirect = false; }],
       ['no UI', () => { for (const e of hudEls) { e._d = e.style.display; e.style.display = 'none'; } }, () => { for (const e of hudEls) e.style.display = e._d || ''; }],
@@ -70,5 +70,7 @@ function xfProbe() {
   const vv = window.visualViewport;
   const chip = document.querySelector('.mm .chip'); let box = '';
   if (chip) { const r = chip.getBoundingClientRect(); box = ` chip rect ${r.width.toFixed(1)}x${r.height.toFixed(1)} vs layout ${chip.offsetWidth}x${chip.offsetHeight}  anims ${document.getAnimations().length}`; }
+  let chain = ''; for (let e = chip; e && e !== document.documentElement; e = e.parentElement) { const c = getComputedStyle(e); const bits = []; for (const k of ['transform', 'rotate', 'scale', 'translate', 'perspective', 'zoom', 'filter', 'willChange']) { const v = c[k]; if (v && v !== 'none' && v !== 'auto' && v !== '1' && v !== 'normal') bits.push(k + '=' + String(v).slice(0, 22)); } if (bits.length) chain += ` [${e.tagName.toLowerCase()}${e.className ? '.' + String(e.className).split(' ')[0] : ''} ${bits.join(' ')}]`; }
+  box += '\n' + 'chain:' + (chain || ' none');
   return box + '\n' + `xf html:${t(document.documentElement)} body:${t(document.body)} sys:${t(document.getElementById('sys-root'))} mm:${t(document.querySelector('.mm'))} vv:${vv ? vv.scale.toFixed(2) + '@' + vv.offsetLeft.toFixed(0) + ',' + vv.offsetTop.toFixed(0) : '-'}`;
 }

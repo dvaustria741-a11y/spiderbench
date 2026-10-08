@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { badgeImage, badge } from './icons.js';
 
-let PXM = 0.6;              // base-map pixels per metre (lowered automatically if the big canvas fails to allocate)
+let PXM = globalThis.__LITE_R ? 0.4 : 0.6;              // base-map pixels per metre (lowered automatically if the big canvas fails to allocate)
 const K_UP = 0.3, K_E = 0.07; // oblique extrusion: map-metres of north / east roof shift per metre of height
 const FONT = '"Spiderbench Condensed", "Barlow Condensed", "Arial Narrow", sans-serif';
 const MAPC = { water0: '#0b2552', water1: '#0a2048', street: '#07122c', road: '#1a2750', avenue: '#223263', pier: '#1e2a4c', block: '#0e1b40', park: '#123f55', tree0: 'rgba(60,150,160,.42)', tree1: 'rgba(90,180,190,.32)', bg: '#0a2048' };
@@ -148,7 +148,7 @@ export function createMapPage(sys) {
 
   // ---------------------------------------------------------------- view
   const view = { x: 0, z: 0, s: 0.55 };
-  let W = 0, H = 0, dpr = 1, dirty = true, hover = null, mouse = null, drag = null, time = 0, pulse = 0;
+  let drawAcc = 0, W = 0, H = 0, dpr = 1, dirty = true, hover = null, mouse = null, drag = null, time = 0, pulse = 0;
   const toS = (x, z) => [(x - view.x) * view.s * dpr + W / 2, (z - view.z) * view.s * dpr + H / 2];
   const toSY = (x, y, z) => toS(x + y * K_E, z - y * K_UP); // oblique 3D projection (matches the extruded base map)
   const _cd = new THREE.Vector3();
@@ -253,7 +253,7 @@ export function createMapPage(sys) {
     }
   }
   function draw() {
-    const r = cv.getBoundingClientRect(); dpr = Math.min(2, devicePixelRatio);
+    const r = cv.getBoundingClientRect(); dpr = globalThis.__LITE_R ? 1 : Math.min(2, devicePixelRatio);
     const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
     W = w; H = h;
@@ -488,7 +488,8 @@ export function createMapPage(sys) {
       if (held.has('KeyA') || held.has('ArrowLeft')) view.x -= sp; if (held.has('KeyD') || held.has('ArrowRight')) view.x += sp;
       if (held.size) clampView();
       travel.update(0);
-      draw(); if (pulse > 0.25) { pulse = 0; updateLegend(); }
+      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > 0.1) { drawAcc = 0; dirty = false; draw(); } // 10 Hz idle redraw (the canvas was fully repainted every frame)
+      if (pulse > 0.25) { pulse = 0; updateLegend(); }
     },
   };
 }
