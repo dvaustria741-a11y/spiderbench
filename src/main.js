@@ -113,12 +113,12 @@ if (shotName) {
     const dt = ctx.realDt * (ctx.timeScale ?? 1);
     const n = performance.now, a = n.call(performance);
     player.update(dt); const b = n.call(performance);
-    if (!ctx.menuActive) world.update(dt, camera); const c = n.call(performance); // the title screen only shows the hero + sky
+    if (!ctx.menuActive && !ctx.benchNoWorld) world.update(dt, camera); const c = n.call(performance); // the title screen only shows the hero + sky
     lighting.update(camera); const d2 = n.call(performance);
     hud.update(dt); const e = n.call(performance);
     for (const s of ctx.systems) s.update?.(dt);
     const t1 = n.call(performance);
-    pipeline.render(dt);
+    if (ctx.benchDirect) renderer.render(scene, camera); else pipeline.render(dt); // (benchDirect: perf benchmark only - skips every post pass)
     const t2 = n.call(performance); const P = ctx.perf || (ctx.perf = { upd: 0, rnd: 0, frame: 0, pl: 0, wo: 0, li: 0, hu: 0, sy: 0, gpu: 0 });
     if (ctx.perfGpu) { const g0 = n.call(performance); renderer.getContext().finish(); sm0(P, n.call(performance) - g0); } // GPU time still outstanding after the draw calls were submitted
     const k = 0.1, sm = (key, v) => { P[key] += (v - P[key]) * k; };
