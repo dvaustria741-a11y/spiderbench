@@ -101,6 +101,7 @@ if (shotName) {
   window.__shotReady = true;
 } else {
   const clock = new THREE.Clock();
+  const sm0 = (P, v) => { P.gpu += (v - P.gpu) * 0.1; };
   function frame(realDt) {
     ctx.realDt = realDt;
     const fl = ctx.flow;
@@ -118,8 +119,10 @@ if (shotName) {
     for (const s of ctx.systems) s.update?.(dt);
     const t1 = n.call(performance);
     pipeline.render(dt);
-    const t2 = n.call(performance); const P = ctx.perf || (ctx.perf = { upd: 0, rnd: 0, frame: 0, pl: 0, wo: 0, li: 0, hu: 0, sy: 0 });
+    const t2 = n.call(performance); const P = ctx.perf || (ctx.perf = { upd: 0, rnd: 0, frame: 0, pl: 0, wo: 0, li: 0, hu: 0, sy: 0, gpu: 0 });
+    if (ctx.perfGpu) { const g0 = n.call(performance); renderer.getContext().finish(); sm0(P, n.call(performance) - g0); } // GPU time still outstanding after the draw calls were submitted
     const k = 0.1, sm = (key, v) => { P[key] += (v - P[key]) * k; };
+
     sm('upd', t1 - a); sm('rnd', t2 - t1); sm('frame', (ctx.rawDt ?? realDt) * 1000); sm('pl', b - a); sm('wo', c - b); sm('li', d2 - c); sm('hu', e - d2); sm('sy', t1 - e);
     warmup?.step(); // (perf r3)
     if (++framesDrawn === 1) boot.sub(0.4); // the first frame (remaining uploads / links) is in

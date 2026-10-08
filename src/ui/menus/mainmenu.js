@@ -58,7 +58,7 @@ export function createMainMenu(sys, ctx) {
 
   // ---- hero camera (the live character, front-on, turning slowly; the camera keeps clear of walls)
   const _c = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _t = new THREE.Vector3(), _d = new THREE.Vector3();
-  let yaw = 0, dist = 3.2, camSave = null, active = false, dragX = null, cityNode = null;
+  let yaw = 0, dist = 3.2, camSave = null, active = false, dragX = null, cityNode = null, hidden = [];
   function cameraHook(dt) {
     const cam = ctx.camera, P = ctx.player;
     yaw += dt * (dragX == null ? 0.1 : 0);
@@ -84,6 +84,7 @@ export function createMainMenu(sys, ctx) {
     const sub = $('.sub'); sub.textContent = `Level ${sys.prog.level} · ${save.persistent ? 'Local save' : 'Test session'}`;
     flow.setMode('menu'); flow.setCameraHook(cameraHook); ui.setVisible(false);
     cityNode = ctx.scene.getObjectByName('city'); if (cityNode) cityNode.visible = false; // the title screen only needs the hero + sky: no city draw calls
+    hidden = ['systems-markers'].map(n => ctx.scene.getObjectByName(n)).filter(o => o && o.visible); for (const o of hidden) o.visible = false; // tower / collectible markers floated in the sky
     ctx.menuActive = true; // main.js caps the frame rate at 30 while the menu is up
     el.classList.remove('fadeout'); el.classList.add('on'); ctx.pipeline.resetHistory?.();
     window.__sysMenu = { open: true, tab: 'main' };
@@ -124,7 +125,7 @@ export function createMainMenu(sys, ctx) {
     await new Promise(r => setTimeout(r, 280)); // let the loading screen fade in over the menu
     el.classList.remove('on', 'fadeout');
     ctx.camera.position.copy(camSave.p); ctx.camera.quaternion.copy(camSave.q); ctx.camera.fov = camSave.fov; ctx.camera.updateProjectionMatrix();
-    if (cityNode) cityNode.visible = true; ctx.menuActive = false;
+    if (cityNode) cityNode.visible = true; for (const o of hidden) o.visible = true; hidden = []; ctx.menuActive = false;
     flow.setMode('play'); ctx.pipeline.resetHistory?.(); // the game now renders behind the loading screen
     const t0 = performance.now(), NEED = 8, MIN = 2200, MAX = 25000; let frames = 0;
     while (true) { // wait for a handful of real frames + a minimum time, whichever is slower (hard cap so it can never hang)

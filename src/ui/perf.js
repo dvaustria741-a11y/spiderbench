@@ -8,11 +8,11 @@ export function initPerf(ctx) {
   const forced = new URLSearchParams(location.search).has('fps');
   setInterval(() => {
     const on = forced || window.__sys?.save?.state?.settings?.showFps === true;
-    el.style.display = on ? 'block' : 'none'; if (!on) return;
+    el.style.display = on ? 'block' : 'none'; ctx.perfGpu = on; if (!on) return;
     const P = ctx.perf || { upd: 0, rnd: 0, frame: 0 }, i = ctx.renderer.info;
     const sz = ctx.renderer.getDrawingBufferSize(new ctx.THREE.Vector2());
     if (!(ctx._tg && performance.now() - ctx._tgT < 4000)) { ctx._tg = topGroups(ctx.scene); ctx._tgT = performance.now(); }
-    el.textContent = `buf ${sz.x}x${sz.y}  shadows ${ctx.renderer.shadowMap.enabled ? 'ON' : 'off'}  lod ${globalThis.__LOD_NEAR ?? 650}m\n${(1000 / Math.max(1, P.frame)).toFixed(0)} fps  (${P.frame.toFixed(1)} ms)\nupdate ${P.upd.toFixed(1)} ms  render ${P.rnd.toFixed(1)} ms\nplayer ${(P.pl || 0).toFixed(1)}  world ${(P.wo || 0).toFixed(1)}  light ${(P.li || 0).toFixed(1)}  hud ${(P.hu || 0).toFixed(1)}  sys ${(P.sy || 0).toFixed(1)}\ncalls ${i.render.calls}  tris ${(i.render.triangles / 1000).toFixed(0)}k\ngeo ${i.memory.geometries}  tex ${i.memory.textures}\n${ctx._tg}`;
+    el.textContent = `buf ${sz.x}x${sz.y}  shadows ${ctx.renderer.shadowMap.enabled ? 'ON' : 'off'}  lod ${globalThis.__LOD_NEAR ?? 650}m\n${(1000 / Math.max(1, P.frame)).toFixed(0)} fps  (${P.frame.toFixed(1)} ms)\nupdate ${P.upd.toFixed(1)} ms  render ${P.rnd.toFixed(1)} ms  gpu-wait ${(P.gpu || 0).toFixed(1)} ms\nplayer ${(P.pl || 0).toFixed(1)}  world ${(P.wo || 0).toFixed(1)}  light ${(P.li || 0).toFixed(1)}  hud ${(P.hu || 0).toFixed(1)}  sys ${(P.sy || 0).toFixed(1)}\ncalls ${i.render.calls}  tris ${(i.render.triangles / 1000).toFixed(0)}k\ngeo ${i.memory.geometries}  tex ${i.memory.textures}\n${ctx._tg}\n${xfProbe()}`;
   }, 500);
 }
 
@@ -30,5 +30,16 @@ function topGroups(scene) {
     if (tris > 0) out.push([g.name || g.type, tris, draws]);
   }
   out.sort((a, b) => b[1] - a[1]);
-  return out.slice(0, 4).map(([n, t, d]) => `${String(n).slice(0, 14)} ${(t / 1e6).toFixed(1)}M/${d}`).join('  ');
+  const lines = out.slice(0, 4).map(([n, t, d]) => `${String(n).slice(0, 14)} ${(t / 1e6).toFixed(1)}M/${d}`).join('  ');
+  const big = scene.children.find(g => (g.name || g.type) === out[0]?.[0]);
+  if (!big) return lines;
+  const kids = big.children.filter(c => c.visible).map(c => { let t = 0, d = 0; c.traverse(o => { if (!o.visible || !(o.isMesh || o.isInstancedMesh) || !o.geometry) return; t += ((o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position?.count || 0) / 3) * (o.isInstancedMesh ? o.count : 1); d++; }); return [c.name || c.type, t, d]; }).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  return lines + '\n  in ' + (out[0][0]) + ': ' + kids.map(([n, t, d]) => `${String(n).slice(0, 14)} ${(t / 1e6).toFixed(1)}M/${d}`).join('  ');
+}
+
+// which element (if any) carries a CSS transform / zoom -> explains a tilted or shifted UI
+function xfProbe() {
+  const t = e => { if (!e) return '-'; const c = getComputedStyle(e); return (c.transform !== 'none' ? c.transform.slice(0, 26) : 'none') + (c.rotate && c.rotate !== 'none' ? ' rot ' + c.rotate : ''); };
+  const vv = window.visualViewport;
+  return `xf html:${t(document.documentElement)} body:${t(document.body)} sys:${t(document.getElementById('sys-root'))} mm:${t(document.querySelector('.mm'))} vv:${vv ? vv.scale.toFixed(2) + '@' + vv.offsetLeft.toFixed(0) + ',' + vv.offsetTop.toFixed(0) : '-'}`;
 }
