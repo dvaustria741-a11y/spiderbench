@@ -10,6 +10,25 @@ export function initPerf(ctx) {
     const on = forced || window.__sys?.save?.state?.settings?.showFps === true;
     el.style.display = on ? 'block' : 'none'; if (!on) return;
     const P = ctx.perf || { upd: 0, rnd: 0, frame: 0 }, i = ctx.renderer.info;
-    el.textContent = `${(1000 / Math.max(1, P.frame)).toFixed(0)} fps  (${P.frame.toFixed(1)} ms)\nupdate ${P.upd.toFixed(1)} ms  render ${P.rnd.toFixed(1)} ms\nplayer ${(P.pl || 0).toFixed(1)}  world ${(P.wo || 0).toFixed(1)}  light ${(P.li || 0).toFixed(1)}  hud ${(P.hu || 0).toFixed(1)}  sys ${(P.sy || 0).toFixed(1)}\ncalls ${i.render.calls}  tris ${(i.render.triangles / 1000).toFixed(0)}k\ngeo ${i.memory.geometries}  tex ${i.memory.textures}`;
+    const sz = ctx.renderer.getDrawingBufferSize(new ctx.THREE.Vector2());
+    if (!(ctx._tg && performance.now() - ctx._tgT < 4000)) { ctx._tg = topGroups(ctx.scene); ctx._tgT = performance.now(); }
+    el.textContent = `buf ${sz.x}x${sz.y}  shadows ${ctx.renderer.shadowMap.enabled ? 'ON' : 'off'}\n${(1000 / Math.max(1, P.frame)).toFixed(0)} fps  (${P.frame.toFixed(1)} ms)\nupdate ${P.upd.toFixed(1)} ms  render ${P.rnd.toFixed(1)} ms\nplayer ${(P.pl || 0).toFixed(1)}  world ${(P.wo || 0).toFixed(1)}  light ${(P.li || 0).toFixed(1)}  hud ${(P.hu || 0).toFixed(1)}  sys ${(P.sy || 0).toFixed(1)}\ncalls ${i.render.calls}  tris ${(i.render.triangles / 1000).toFixed(0)}k\ngeo ${i.memory.geometries}  tex ${i.memory.textures}\n${ctx._tg}`;
   }, 500);
+}
+
+// heaviest top-level scene groups by static triangle count (every visible mesh x instances, no frustum culling) -> where the 13M triangles live
+function topGroups(scene) {
+  const out = [];
+  for (const g of scene.children) {
+    if (!g.visible) continue; let tris = 0, draws = 0;
+    g.traverse(o => {
+      if (!o.visible || !(o.isMesh || o.isInstancedMesh)) return;
+      const geo = o.geometry; if (!geo) return;
+      const t = ((geo.index ? geo.index.count : geo.attributes.position?.count || 0) / 3) * (o.isInstancedMesh ? o.count : 1);
+      tris += t; draws++;
+    });
+    if (tris > 0) out.push([g.name || g.type, tris, draws]);
+  }
+  out.sort((a, b) => b[1] - a[1]);
+  return out.slice(0, 4).map(([n, t, d]) => `${String(n).slice(0, 14)} ${(t / 1e6).toFixed(1)}M/${d}`).join('  ');
 }

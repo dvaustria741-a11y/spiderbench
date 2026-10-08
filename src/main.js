@@ -112,7 +112,7 @@ if (shotName) {
     const dt = ctx.realDt * (ctx.timeScale ?? 1);
     const n = performance.now, a = n.call(performance);
     player.update(dt); const b = n.call(performance);
-    world.update(dt, camera); const c = n.call(performance);
+    if (!ctx.menuActive) world.update(dt, camera); const c = n.call(performance); // the title screen only shows the hero + sky
     lighting.update(camera); const d2 = n.call(performance);
     hud.update(dt); const e = n.call(performance);
     for (const s of ctx.systems) s.update?.(dt);

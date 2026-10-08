@@ -63,13 +63,12 @@ export function createMainMenu(sys, ctx) {
     const cam = ctx.camera, P = ctx.player;
     yaw += dt * (dragX == null ? 0.1 : 0);
     _c.copy(P.position); _c.y += 0.9;
-    let want = 3.4;
-    _d.set(Math.sin(yaw), 0.12, Math.cos(yaw)).normalize();
-    const hit = ctx.world.raycast?.(_c, _d, 3.6); if (hit) want = Math.max(1.5, hit.distance - 0.4);
+    const want = 4.1;
+    _d.set(Math.sin(yaw), 0.1, Math.cos(yaw)).normalize();
     dist += (want - dist) * (1 - Math.exp(-6 * dt));
     cam.position.copy(_c).addScaledVector(_d, dist);
     _f.copy(_c).sub(cam.position).setY(0).normalize(); _r.set(-_f.z, 0, _f.x);
-    _t.copy(_c).addScaledVector(_r, -0.95); _t.y -= 0.05;
+    _t.copy(_c).addScaledVector(_r, 1.35); _t.y -= 0.02; // look right of the hero so he sits in the left third of the screen
     cam.up.set(0, 1, 0); cam.lookAt(_t);
     if (cam.fov !== 40) { cam.fov = 40; cam.updateProjectionMatrix(); }
     ctx.pipeline.setDof?.({ aperture: 0 }); ctx.pipeline.setMotionBlur?.(0);
@@ -89,15 +88,53 @@ export function createMainMenu(sys, ctx) {
     el.classList.remove('fadeout'); el.classList.add('on'); ctx.pipeline.resetHistory?.();
     window.__sysMenu = { open: true, tab: 'main' };
   }
-  function play() {
+  // ---- loading screen shown between Play and the first game frame: the city is switched back on behind it and a few
+  // frames are rendered (shader compiles + first streaming happen here instead of as a freeze in the game)
+  const TIPS = ['Hold the swing button in the air to web-swing, and let go to release.', 'Tap zip to web-zip to the marked point and perch there.', 'Jump while swinging to release and launch off the swing.', 'Drag anywhere on the right side of the screen to look around.', 'Running slowly? Options > Graphics lets you lower Draw Distance, Shadows and Population.'];
+  function loadingScreen() {
+    if (!document.getElementById('ld-css')) {
+      const st = document.createElement('style'); st.id = 'ld-css';
+      st.textContent = `#ld{position:fixed;inset:0;z-index:2000;background:#000;opacity:0;transition:opacity .25s;pointer-events:auto;color:#fff;font-family:system-ui,'Segoe UI',Roboto,sans-serif;touch-action:none}
+#ld.on{opacity:1}#ld .img{position:absolute;left:0;right:0;top:21%;bottom:21%;background:#111 center/cover no-repeat}
+#ld .tip{position:absolute;left:calc(2.4% + env(safe-area-inset-left));bottom:calc(3.5% + env(safe-area-inset-bottom));display:flex;gap:14px;align-items:center;background:#1b1b1b;border-radius:10px;padding:12px 18px 12px 14px;max-width:34%;font:500 clamp(11px,1.9vh,16px)/1.3 system-ui,sans-serif;transition:opacity .3s}
+#ld .tip i{flex:none;width:34px;height:34px;border-radius:50%;background:#fff;color:#e3262f;font:900 21px/34px Georgia,serif;text-align:center}
+#ld .mark{position:absolute;right:calc(4% + env(safe-area-inset-right));bottom:calc(3.5% + env(safe-area-inset-bottom));width:min(11vw,104px)}
+#ld .pct{position:absolute;right:calc(4% + env(safe-area-inset-right));bottom:calc(3.5% + env(safe-area-inset-bottom) + min(11vw,104px) * .95);font:700 13px system-ui;letter-spacing:.14em;opacity:.7;text-align:center;width:min(11vw,104px)}`;
+      document.head.appendChild(st);
+    }
+    const d = document.createElement('div'); d.id = 'ld';
+    const n = 1 + Math.floor(Math.random() * 6);
+    d.innerHTML = `<div class="img" style="background-image:url(${(import.meta.env?.BASE_URL || '/') + 'assets/loading/0' + n + '.webp'})"></div>
+      <div class="tip"><i>i</i><span></span></div><div class="pct">0%</div>
+      <svg class="mark" viewBox="0 0 100 90"><defs><clipPath id="ldc"><rect id="ldr" x="0" y="90" width="100" height="0"/></clipPath></defs><path d="M50 4 L96 86 H4 Z" fill="#e3262f" opacity=".28"/><path d="M50 4 L96 86 H4 Z" fill="#fff" clip-path="url(#ldc)"/></svg>`;
+    document.body.appendChild(d);
+    const tipEl = d.querySelector('.tip span'), r = d.querySelector('#ldr'), pct = d.querySelector('.pct');
+    let ti = Math.floor(Math.random() * TIPS.length); tipEl.textContent = TIPS[ti];
+    const tt = setInterval(() => { d.querySelector('.tip').style.opacity = 0; setTimeout(() => { tipEl.textContent = TIPS[ti = (ti + 1) % TIPS.length]; d.querySelector('.tip').style.opacity = 1; }, 300); }, 4200);
+    requestAnimationFrame(() => d.classList.add('on'));
+    return {
+      progress(p) { p = Math.max(0, Math.min(1, p)); r.setAttribute('y', 90 * (1 - p)); r.setAttribute('height', 90 * p); pct.textContent = Math.round(p * 100) + '%'; },
+      close() { clearInterval(tt); d.classList.remove('on'); setTimeout(() => d.remove(), 300); },
+    };
+  }
+  const nextFrame = () => new Promise(r => requestAnimationFrame(r));
+  async function play() {
     if (!active) return; active = false; audio.sfx.select(); audio.sfx.open?.();
-    el.classList.add('fadeout');
+    const L = loadingScreen(); window.__sysMenu = { open: false };
+    await new Promise(r => setTimeout(r, 280)); // let the loading screen fade in over the menu
+    el.classList.remove('on', 'fadeout');
     ctx.camera.position.copy(camSave.p); ctx.camera.quaternion.copy(camSave.q); ctx.camera.fov = camSave.fov; ctx.camera.updateProjectionMatrix();
     if (cityNode) cityNode.visible = true; ctx.menuActive = false;
-    flow.setMode('play'); ui.setVisible(true); ctx.pipeline.resetHistory?.();
-    setTimeout(() => { el.classList.remove('on', 'fadeout'); }, 500);
+    flow.setMode('play'); ctx.pipeline.resetHistory?.(); // the game now renders behind the loading screen
+    const t0 = performance.now(), NEED = 8, MIN = 2200, MAX = 25000; let frames = 0;
+    while (true) { // wait for a handful of real frames + a minimum time, whichever is slower (hard cap so it can never hang)
+      await nextFrame(); frames++; const t = performance.now() - t0;
+      L.progress(Math.min(0.97, Math.min(frames / NEED, t / MIN) * 0.97));
+      if ((frames >= NEED && t >= MIN) || t > MAX) break;
+    }
+    L.progress(1); await new Promise(r => setTimeout(r, 180));
+    ui.setVisible(true); L.close();
     if (!matchMedia('(pointer: coarse)').matches) ctx.renderer.domElement.requestPointerLock?.();
-    window.__sysMenu = { open: false };
   }
 
   el.addEventListener('click', e => {

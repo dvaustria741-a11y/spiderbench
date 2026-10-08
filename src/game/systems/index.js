@@ -110,7 +110,7 @@ export function initSystems(ctx) {
     if (effScale !== appliedScale) {
       appliedScale = effScale;
       if (appliedScale !== 1 || ctx.renderer.getPixelRatio() !== Math.min(devicePixelRatio, 1.5)) {
-        ctx.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5) * effScale);
+        ctx.renderer.setPixelRatio((globalThis.__LITE_R ? 1 : Math.min(devicePixelRatio, 1.5)) * effScale);
         ctx.renderer.setSize(innerWidth, innerHeight); ctx.pipeline.setSize?.(innerWidth, innerHeight);
       }
     }

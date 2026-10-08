@@ -19,6 +19,7 @@ import { cityLights } from '../../render/citylights.js'; // (night) real headlig
 import { nightK } from '../../render/daynight.js'; // (night)
 
 const RA = 640;            // streaming radius (m)
+const PARK_KEEP = globalThis.__PARK_KEEP ?? 1; // fraction of curb spots that keep a parked car (index.html derives it from Vehicle Density)
 const PARK_R = 500;        // parked cars exist on links within this radius ((citylife r2) 420 -> 500: no pop-in seen from rooftops, inside the haze)
 const HI_D = 48, LOW_D = 230; // (vehicles r1) LOD0 (~5.5k tris) < 48 m, LOD1 (~1.1k) < 230 m, LOD2 (~160, grouped) beyond
 const MAX_CARS = 2600;
@@ -389,6 +390,7 @@ export function createTraffic({ scene, roads, phase, geos, mats, models = null }
       for (const q of special) out.push(q);
       for (let s = 9 + rng() * 5; s < L.len - 12; s += 5.9 + rng() * 2.4) {
         if (rng() < (L.kind === 'st' ? 0.16 : 0.28)) continue;
+        if (PARK_KEEP < 1 && (Math.abs(Math.sin(L.id * 91.7 + s * 12.31) * 43758.5453) % 1) > PARK_KEEP) continue; // Options > Vehicle Density thins the curb
         if (special.some(q => Math.abs(q.s - s) < q.len / 2 + 3.4)) continue; // (street r10) fewer parked cars on avenues (street r11: 0.45 -> 0.28, critic 'parked cars along curbs')
         let r = rng();
         let type = r < 0.08 ? 'taxi' : r < 0.52 ? 'sedan' : r < 0.93 ? 'suv' : 'truck';
