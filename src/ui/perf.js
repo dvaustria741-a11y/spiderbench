@@ -26,7 +26,17 @@ export function initPerf(ctx) {
       on(); await frames(10); const ms = await frames(24); off();
       out.push(`${name} ${ms.toFixed(0)}ms`); set(`BENCH running... ${out.join('  ')}`);
     }
-    set(`BENCH done: ${out.join('  ')}`); busy = false;
+    // part 2: hide each big top-level group of the city on its own and see how much frame time it gives back
+    const baseMs = parseFloat((out[0] || '').split(' ').pop()) || 0, tri = c => { let t = 0; c.traverse(o => { if (!o.visible || !(o.isMesh || o.isInstancedMesh) || !o.geometry) return; t += ((o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position?.count || 0) / 3) * (o.isInstancedMesh ? o.count : 1); }); return t; };
+    const kids = city.children.map((c, i) => [c, (c.name || c.type) + (c.name ? '' : '#' + i), c.visible ? tri(c) : 0]).filter(k => k[2] > 40000).sort((a, b) => b[2] - a[2]).slice(0, 12);
+    const gains = [];
+    for (const [c, name, t] of kids) {
+      set(`BENCH part 2: hiding ${name}...  (${gains.length}/${kids.length})  - do not touch`);
+      c.visible = false; await frames(6); const ms = await frames(14); c.visible = true;
+      gains.push([name, t, Math.round(baseMs - ms)]);
+    }
+    gains.sort((a, b) => b[2] - a[2]);
+    set(`BENCH done: ${out.join('  ')}\nBENCH hide-one (frame ms saved): ${gains.slice(0, 7).map(([n, t, g]) => `${n.slice(0, 16)} ${g >= 0 ? '-' : '+'}${Math.abs(g)}ms (${(t / 1e6).toFixed(1)}M)`).join('  ')}`); busy = false;
   });
 
   const el = document.createElement('div');
