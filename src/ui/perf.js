@@ -49,7 +49,7 @@ export function initPerf(ctx) {
     const P = ctx.perf || { upd: 0, rnd: 0, frame: 0 }, i = ctx.renderer.info;
     const sz = ctx.renderer.getDrawingBufferSize(new ctx.THREE.Vector2());
     if (!(ctx._tg && performance.now() - ctx._tgT < 4000)) { ctx._tg = topGroups(ctx.scene); ctx._tgT = performance.now(); }
-    el.textContent = `buf ${sz.x}x${sz.y}  shadows ${ctx.renderer.shadowMap.enabled ? 'ON' : 'off'}  lod ${globalThis.__LOD_NEAR ?? 650}m\n${(1000 / Math.max(1, P.frame)).toFixed(0)} fps  (${P.frame.toFixed(1)} ms)\nupdate ${P.upd.toFixed(1)} ms  render ${P.rnd.toFixed(1)} ms  gpu-wait ${(P.gpu || 0).toFixed(1)} ms\nplayer ${(P.pl || 0).toFixed(1)}  world ${(P.wo || 0).toFixed(1)}  light ${(P.li || 0).toFixed(1)}  hud ${(P.hu || 0).toFixed(1)}  sys ${(P.sy || 0).toFixed(1)}\ncalls ${i.render.calls}  tris ${(i.render.triangles / 1000).toFixed(0)}k\ngeo ${i.memory.geometries}  tex ${i.memory.textures}\n${ctx._tg}\n${xfProbe()}${ctx._bench ? '\n' + ctx._bench : ''}`;
+    el.textContent = `buf ${sz.x}x${sz.y}  shadows ${ctx.renderer.shadowMap.enabled ? 'ON' : 'off'}  lod ${globalThis.__LOD_NEAR ?? 650}m\n${(1000 / Math.max(1, P.frame)).toFixed(0)} fps  (${P.frame.toFixed(1)} ms)\nmap-draw ${(window.__mapMs ?? 0).toFixed(1)} ms  update ${P.upd.toFixed(1)} ms  render ${P.rnd.toFixed(1)} ms  gpu-wait ${(P.gpu || 0).toFixed(1)} ms\nplayer ${(P.pl || 0).toFixed(1)}  world ${(P.wo || 0).toFixed(1)}  light ${(P.li || 0).toFixed(1)}  hud ${(P.hu || 0).toFixed(1)}  sys ${(P.sy || 0).toFixed(1)}\ncalls ${i.render.calls}  tris ${(i.render.triangles / 1000).toFixed(0)}k\ngeo ${i.memory.geometries}  tex ${i.memory.textures}\n${ctx._tg}\n${xfProbe()}${ctx._bench ? '\n' + ctx._bench : ''}`;
   }, 500);
 }
 

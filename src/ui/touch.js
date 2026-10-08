@@ -41,9 +41,15 @@ export function initTouch(ctx) {
   // camera drag (right side, under the buttons)
   const look = document.createElement('div'); look.className = 'look'; root.appendChild(look);
   let lookId = null, lx = 0, ly = 0;
-  look.addEventListener('pointerdown', e => { if (lookId !== null) return; lookId = e.pointerId; lx = e.clientX; ly = e.clientY; look.setPointerCapture(e.pointerId); });
-  look.addEventListener('pointermove', e => { if (e.pointerId !== lookId) return; input.touchLook((e.clientX - lx) * 1.6, (e.clientY - ly) * 1.6); lx = e.clientX; ly = e.clientY; });
-  const lookEnd = e => { if (e.pointerId === lookId) lookId = null; };
+  let promptCode = null;
+  const hitPrompt = e => { const p = document.querySelector('.sys-prompt.on'); if (!p) return null; const r = p.getBoundingClientRect(); const m = 28; if (e.clientX < r.left - m || e.clientX > r.right + m || e.clientY < r.top - m || e.clientY > r.bottom + m) return null; const k = (p.querySelector('.ring b')?.textContent || 'F').trim().toUpperCase(); return /^[A-Z]$/.test(k) ? 'Key' + k : null; };
+  look.addEventListener('pointerdown', e => {
+    if (lookId !== null) return; const pc = hitPrompt(e); // on the interact prompt: press + hold its key (hold-to-activate prompts fill while you keep your finger down)
+    lookId = e.pointerId; lx = e.clientX; ly = e.clientY; look.setPointerCapture(e.pointerId);
+    if (pc) { promptCode = pc; fire('down', pc); if (navigator.vibrate) navigator.vibrate(10); }
+  });
+  look.addEventListener('pointermove', e => { if (e.pointerId !== lookId || promptCode) return; input.touchLook((e.clientX - lx) * 1.6, (e.clientY - ly) * 1.6); lx = e.clientX; ly = e.clientY; });
+  const lookEnd = e => { if (e.pointerId === lookId) { lookId = null; if (promptCode) { fire('up', promptCode); promptCode = null; } } };
   look.addEventListener('pointerup', lookEnd); look.addEventListener('pointercancel', lookEnd);
 
   // move stick (nearly invisible: faint ring + soft knob)

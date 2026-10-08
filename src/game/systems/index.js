@@ -97,7 +97,9 @@ export function initSystems(ctx) {
     const td = { off: 0, low: 0.4, medium: 1, high: 1.4 }[s.gfx?.traffic];
     if (td != null) ctx.world.life?.traffic?.setDensity?.(td);
     globalThis.__LOD_NEAR = { low: 150, medium: 300, high: 650 }[s.gfx?.lod]; // live: city.js reads it every frame
-    for (const n of ['farShore', 'hinterland', 'trees-street-f']) { const o = ctx.scene.getObjectByName(n); if (o) o.visible = s.gfx?.lod !== 'low'; } // far scenery beyond the phone-sized world
+    globalThis.__LOD_FAR = { low: 330, medium: 650 }[s.gfx?.lod] ?? Infinity; // tile LOD meshes beyond this are not drawn at all
+    { const lowLod = s.gfx?.lod === 'low', re = /^(farShore|hinterland|coast$|trees-(street-far|park|small)|trunks-(street-far|park|small))/; // far scenery beyond the phone-sized world
+      for (const c of ctx.scene.getObjectByName('city')?.children || []) if (re.test(c.name)) c.visible = !lowLod; }
     { const want = s.gfx?.shadows !== 'off'; if (ctx.lighting?.setShadows && ctx.renderer.shadowMap.enabled !== want) ctx.lighting.setShadows(want); } // live (one-time shader recompile)
     // touch controls
     const tui = document.getElementById('touch-ui');

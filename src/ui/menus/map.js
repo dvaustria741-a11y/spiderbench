@@ -22,7 +22,8 @@ export function createMapPage(sys) {
     <div class="zoomhint">Wheel / + - &nbsp;zoom<br>Drag / WASD &nbsp;pan<br>Click &nbsp;teleport / set waypoint<br>Right-click &nbsp;clear waypoint<br>C &nbsp;center on Spider-Man</div>
     <div class="card sys-panel cut hide"><small></small><h5></h5><p></p><div class="acts"></div></div>
     <div class="reveal-hint"><small>DISTRICT UNLOCKED</small><b></b><span><span class="sys-key">Esc</span>Continue</span></div>`;
-  const cv = el.querySelector('canvas'), g = cv.getContext('2d');
+  const noBlur = c => { if (globalThis.__LITE_R) Object.defineProperty(c, 'shadowBlur', { get: () => 0, set: () => {}, configurable: true }); return c; };
+  const cv = el.querySelector('canvas'), g = noBlur(cv.getContext('2d'));
   const card = el.querySelector('.card'), rowsEl = el.querySelector('.rows');
   const filters = Object.fromEntries(CAT.map(([k]) => [k, true]));
   rowsEl.innerHTML = CAT.map(([k, n]) => `<div class="row" data-k="${k}">${badge(k === 'crime' ? 'crime' : k, 24)}<b>${n}</b><span></span></div>`).join('');
@@ -40,7 +41,7 @@ export function createMapPage(sys) {
     bx0 = b.x0 - 400; bz0 = b.z0 - 120; const x1 = b.x1 + 400, z1 = b.z1 + 60;
     const W = Math.ceil((x1 - bx0) * PXM), H = Math.ceil((z1 - bz0) * PXM);
     base = document.createElement('canvas'); base.width = W; base.height = H; baseMips = null;
-    const c = base.getContext('2d', { willReadFrequently: false });
+    const c = noBlur(base.getContext('2d', { willReadFrequently: false }));
     if (!c) { failBase(); return; }
     const X = x => (x - bx0) * PXM, Z = z => (z - bz0) * PXM;
     const rect = (r, fill) => { c.fillStyle = fill; c.fillRect(X(r.x0), Z(r.z0), (r.x1 - r.x0) * PXM, (r.z1 - r.z0) * PXM); };
@@ -488,7 +489,7 @@ export function createMapPage(sys) {
       if (held.has('KeyA') || held.has('ArrowLeft')) view.x -= sp; if (held.has('KeyD') || held.has('ArrowRight')) view.x += sp;
       if (held.size) clampView();
       travel.update(0);
-      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > 0.1) { drawAcc = 0; dirty = false; draw(); } // 10 Hz idle redraw (the canvas was fully repainted every frame)
+      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > 0.1) { drawAcc = 0; dirty = false; const t0 = performance.now(); draw(); window.__mapMs = performance.now() - t0; } // 10 Hz idle redraw (the canvas was fully repainted every frame)
       if (pulse > 0.25) { pulse = 0; updateLegend(); }
     },
   };

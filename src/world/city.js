@@ -260,7 +260,7 @@ export async function buildCity({ scene, renderer }) {
           const d = Math.hypot(Math.max(0, Math.abs(camera.position.x - tm.cx) - 128), Math.max(0, Math.abs(camera.position.z - tm.cz) - 128));
           if (tm.mesh) { detB.setVisible(tm.i, d < DN); detB.setShadow(tm.i, d < 160); } // (perf) batched tiles
           // citygeo: full facade tile near, bare-mass LOD far (hysteresis 40 m)
-          if (tm.lod) { const near = tm.near ? d < LN + 40 : d < LN; tm.near = near; if (tm.fac) facB.setVisible(tm.i, near); lodB.setVisible(tm.i, !near); }
+          if (tm.lod) { const near = tm.near ? d < LN + 40 : d < LN; tm.near = near; if (tm.fac) facB.setVisible(tm.i, near); lodB.setVisible(tm.i, !near && d < (globalThis.__LOD_FAR ?? Infinity)); }
           // (perf r2) pre-upload the tile about to appear (one vertex buffer per frame, tiles inside the view frustum
           // first), so the swap at 650-690 m / 450 m does not upload ~15-20 MB in one frame (100-150 ms hitches)
           if (!warmed && d < LN + 200 && ((tm.fac && !tm.warmF && !tm.near) || (tm.mesh && !tm.warmD && d >= DN && d < DN + 150))) {
