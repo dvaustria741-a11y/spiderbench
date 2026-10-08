@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS = {
   timeOfDay: 'day', // (lighting2 r3) fixed preset: day | morning | sunrise | sunset | dusk | night | overcast
   puddles: true, // (user r-nopuddles) water / wet patches on the ground in dry weather (rain always wets the streets)
   // options screen (Display / Controls); gfx (Graphics) stays unset until the player touches it, see render/gfxprefs.js
-  displayPreset: 'default', brightness: 0.5, contrast: 0.5, saturation: 0.5, sharpness: 0.5, upscaler: false, frameRate: 'low', gfx: { ...GFX_PRESETS.low }, lowV: 3, // lowV: graphics + display start on Low (players raise them in Options)
+  displayPreset: 'default', brightness: 0.5, contrast: 0.5, saturation: 0.5, sharpness: 0.5, upscaler: false, frameRate: 'low', gfx: { ...GFX_PRESETS.low }, lowV: 4, // lowV: graphics + display start on Low (players raise them in Options)
  
   controlSize: 1, hudOpacity: 1, showFps: false,
   daySun: 'a', // (user r-daysun) Day preset sun direction: a (midday, SSW) | b (late morning, SE) | c (afternoon, WSW)
@@ -42,8 +42,8 @@ export function createSave() {
       if (raw) {
         const s = JSON.parse(raw);
         if (s && s.v === 1) state = { ...defaultState(), ...s, settings: { ...DEFAULT_SETTINGS, ...(s.settings || {}) }, crimes: { ...defaultState().crimes, ...(s.crimes || {}) } };
-        if (!(s.settings?.lowV >= 3)) { // one-time: every graphics / display option goes to Low (the player raises what the phone can take)
-          Object.assign(state.settings, { quality: 'low', renderScale: 0.75, motionBlur: 0, dof: 0, upscaler: false, frameRate: 'low', gfx: { ...GFX_PRESETS.low }, lowV: 3 });
+        if (!(s.settings?.lowV >= 4)) { // one-time: every graphics / display option goes to Low (the player raises what the phone can take)
+          Object.assign(state.settings, { quality: 'low', renderScale: 0.75, motionBlur: 0, dof: 0, upscaler: false, frameRate: 'low', gfx: { ...GFX_PRESETS.low }, lowV: 4 });
           migrated = true;
         }
         if (!(s.settings?.audioV >= 3)) { // old volume scale -> the new defaults (= the mix tuned on the old scale)

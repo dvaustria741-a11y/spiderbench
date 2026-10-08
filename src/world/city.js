@@ -255,14 +255,15 @@ export async function buildCity({ scene, renderer }) {
         facB.endWarm(); detB.endWarm(); // (perf r2) restore last frame's pre-upload tile
         let warmed = false; if (!_fr) { _fr = new THREE.Frustum(); _pm = new THREE.Matrix4(); _sp = new THREE.Sphere(); }
         _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm);
+        const LN = globalThis.__LOD_NEAR ?? 650, DN = Math.min(450, LN * 0.8); // Options > Graphics > Level of Detail
         for (const tm of tileMeshes) { // citylife: nearest-point tile distance; details dissolve by 450 m, cast shadows near only
           const d = Math.hypot(Math.max(0, Math.abs(camera.position.x - tm.cx) - 128), Math.max(0, Math.abs(camera.position.z - tm.cz) - 128));
-          if (tm.mesh) { detB.setVisible(tm.i, d < 450); detB.setShadow(tm.i, d < 160); } // (perf) batched tiles
+          if (tm.mesh) { detB.setVisible(tm.i, d < DN); detB.setShadow(tm.i, d < 160); } // (perf) batched tiles
           // citygeo: full facade tile near, bare-mass LOD far (hysteresis 40 m)
-          if (tm.lod) { const near = tm.near ? d < 690 : d < 650; tm.near = near; if (tm.fac) facB.setVisible(tm.i, near); lodB.setVisible(tm.i, !near); }
+          if (tm.lod) { const near = tm.near ? d < LN + 40 : d < LN; tm.near = near; if (tm.fac) facB.setVisible(tm.i, near); lodB.setVisible(tm.i, !near); }
           // (perf r2) pre-upload the tile about to appear (one vertex buffer per frame, tiles inside the view frustum
           // first), so the swap at 650-690 m / 450 m does not upload ~15-20 MB in one frame (100-150 ms hitches)
-          if (!warmed && d < 850 && ((tm.fac && !tm.warmF && !tm.near) || (tm.mesh && !tm.warmD && d >= 450 && d < 600))) {
+          if (!warmed && d < LN + 200 && ((tm.fac && !tm.warmF && !tm.near) || (tm.mesh && !tm.warmD && d >= DN && d < DN + 150))) {
             _sp.center.set(tm.cx, 60, tm.cz); _sp.radius = 200;
             if (_fr.intersectsSphere(_sp)) {
               if (tm.fac && !tm.warmF && !tm.near) { if (facB.warm(tm.i)) warmed = true; else tm.warmF = true; } // one buffer per frame

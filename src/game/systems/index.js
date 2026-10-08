@@ -96,6 +96,8 @@ export function initSystems(ctx) {
     // Graphics: traffic density is live (the rest of the Graphics list applies after a restart)
     const td = { off: 0, low: 0.4, medium: 1, high: 1.4 }[s.gfx?.traffic];
     if (td != null) ctx.world.life?.traffic?.setDensity?.(td);
+    globalThis.__LOD_NEAR = { low: 150, medium: 300, high: 650 }[s.gfx?.lod]; // live: city.js reads it every frame
+    { const want = s.gfx?.shadows !== 'off'; if (ctx.lighting?.setShadows && ctx.renderer.shadowMap.enabled !== want) ctx.lighting.setShadows(want); } // live (one-time shader recompile)
     // touch controls
     const tui = document.getElementById('touch-ui');
     if (tui) { tui.style.setProperty('--tbs', String(s.controlSize ?? 1)); tui.style.opacity = String(s.hudOpacity ?? 1); }

@@ -5,13 +5,14 @@
 export const SAVE_KEY = 'spiderbench.save.v1';
 
 export const GFX_FIELDS = ['shadows', 'shadowRes', 'shadowDist', 'aa', 'ao', 'reflections', 'gi', 'shafts', 'clouds', 'population', 'drawDist'];
-export const LIVE_FIELDS = ['bloom', 'traffic'];
+export const LIVE_FIELDS = ['bloom', 'traffic', 'lod'];
+export const LOD_NEAR = { low: 150, medium: 300, high: 650 }; // metres: beyond this, buildings are drawn as simple blocks
 
 // per-preset values for every field (Low / Medium / High); a settings.gfx that matches none of them is "Custom"
 export const GFX_PRESETS = {
-  low:    { shadows: 'off',    shadowRes: 'low',    shadowDist: 'low',    aa: 'off', ao: 'off',  reflections: 'off',  gi: 'off', shafts: 'off', clouds: 'low',    population: 'low',    drawDist: 'low',    bloom: 'on', traffic: 'low' },
-  medium: { shadows: 'medium', shadowRes: 'medium', shadowDist: 'medium', aa: 'on', ao: 'low',  reflections: 'low',  gi: 'on',  shafts: 'on',  clouds: 'medium', population: 'medium', drawDist: 'medium', bloom: 'on', traffic: 'medium' },
-  high:   { shadows: 'high',   shadowRes: 'high',   shadowDist: 'high',   aa: 'on', ao: 'high', reflections: 'high', gi: 'on',  shafts: 'on',  clouds: 'high',   population: 'high',   drawDist: 'full',   bloom: 'on', traffic: 'high' },
+  low:    { shadows: 'off',    shadowRes: 'low',    shadowDist: 'low',    aa: 'off', ao: 'off',  reflections: 'off',  gi: 'off', shafts: 'off', clouds: 'low',    population: 'low',    drawDist: 'low', lod: 'low',    bloom: 'on', traffic: 'low' },
+  medium: { shadows: 'medium', shadowRes: 'medium', shadowDist: 'medium', aa: 'on', ao: 'low',  reflections: 'low',  gi: 'on',  shafts: 'on',  clouds: 'medium', population: 'medium', drawDist: 'medium', lod: 'medium', bloom: 'on', traffic: 'medium' },
+  high:   { shadows: 'high',   shadowRes: 'high',   shadowDist: 'high',   aa: 'on', ao: 'high', reflections: 'high', gi: 'on',  shafts: 'on',  clouds: 'high',   population: 'high',   drawDist: 'full', lod: 'high',   bloom: 'on', traffic: 'high' },
 };
 export const DEFAULT_GFX = { ...GFX_PRESETS.high };
 

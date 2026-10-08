@@ -364,6 +364,7 @@ export function createLighting({ renderer, scene }) {
 
   const lighting = {
     sun, csm, sky, fog, quality, reversed, tod, amb: ambShared, city, cityLights,
+    setShadows(on) { quality.shadowsOn = on; renderer.shadowMap.enabled = on; if (on) csm.forceAll = true; },
     cityVol: { strength: 1, density: 0.0045, height: 30 }, nightHaze, // (night) lit haze around the city lights (pipeline cityVolume)
     get timeOfDay() { return tod.name; },
     get envIntensity() { return state.envIntensity; },
