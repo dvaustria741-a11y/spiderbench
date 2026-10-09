@@ -4,15 +4,16 @@
 // change takes effect after "Apply" (reload). Live options (bloom, motion blur, DoF, traffic) bypass this file.
 export const SAVE_KEY = 'spiderbench.save.v1';
 
-export const GFX_FIELDS = ['shadows', 'shadowRes', 'shadowDist', 'aa', 'ao', 'reflections', 'gi', 'shafts', 'clouds', 'population', 'drawDist'];
+export const GFX_FIELDS = ['shadows', 'shadowRes', 'shadowDist', 'aa', 'ao', 'reflections', 'gi', 'shafts', 'clouds', 'population', 'drawDist', 'buildings'];
+export const BLD_KEEP = { normal: 1, sparse: 0.6, verysparse: 0.35 }; // share of ordinary building lots that get built
 export const LIVE_FIELDS = ['bloom', 'traffic', 'lod'];
 export const LOD_NEAR = { low: 100, medium: 240, high: 650 }; // metres: beyond this, buildings are drawn as simple blocks
 
 // per-preset values for every field (Low / Medium / High); a settings.gfx that matches none of them is "Custom"
 export const GFX_PRESETS = {
-  low:    { shadows: 'off',    shadowRes: 'low',    shadowDist: 'low',    aa: 'off', ao: 'off',  reflections: 'off',  gi: 'off', shafts: 'off', clouds: 'low',    population: 'low',    drawDist: 'low', lod: 'low',    bloom: 'on', traffic: 'low' },
-  medium: { shadows: 'medium', shadowRes: 'medium', shadowDist: 'medium', aa: 'on', ao: 'low',  reflections: 'low',  gi: 'on',  shafts: 'on',  clouds: 'medium', population: 'medium', drawDist: 'medium', lod: 'medium', bloom: 'on', traffic: 'medium' },
-  high:   { shadows: 'high',   shadowRes: 'high',   shadowDist: 'high',   aa: 'on', ao: 'high', reflections: 'high', gi: 'on',  shafts: 'on',  clouds: 'high',   population: 'high',   drawDist: 'full', lod: 'high',   bloom: 'on', traffic: 'high' },
+  low:    { shadows: 'off',    shadowRes: 'low',    shadowDist: 'low',    aa: 'off', ao: 'off',  reflections: 'off',  gi: 'off', shafts: 'off', clouds: 'low',    population: 'low',    drawDist: 'low', lod: 'low', buildings: 'normal',    bloom: 'on', traffic: 'low' },
+  medium: { shadows: 'medium', shadowRes: 'medium', shadowDist: 'medium', aa: 'on', ao: 'low',  reflections: 'low',  gi: 'on',  shafts: 'on',  clouds: 'medium', population: 'medium', drawDist: 'medium', lod: 'medium', buildings: 'normal', bloom: 'on', traffic: 'medium' },
+  high:   { shadows: 'high',   shadowRes: 'high',   shadowDist: 'high',   aa: 'on', ao: 'high', reflections: 'high', gi: 'on',  shafts: 'on',  clouds: 'high',   population: 'high',   drawDist: 'full', lod: 'high', buildings: 'normal',   bloom: 'on', traffic: 'high' },
 };
 export const DEFAULT_GFX = { ...GFX_PRESETS.high };
 

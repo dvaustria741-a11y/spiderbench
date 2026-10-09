@@ -90,6 +90,7 @@ export function createOptionsPanel(sys, { onClose } = {}) {
       gcho('bloom', 'Bloom', ONOFF, 'Glow around bright lights. Applies instantly.'),
       gcho('population', 'Population Density', [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], 'How many pedestrians fill the streets. Off removes them completely (needs Apply & Restart).'),
       gcho('traffic', 'Vehicle Density', [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], 'How many cars are on the road. Off stops all moving traffic right away; parked cars are removed after Apply & Restart.'),
+      gcho('buildings', 'City Density', [['normal', 'Normal'], ['sparse', 'Sparse'], ['verysparse', 'Very Sparse']], 'How many buildings fill each block. Sparse leaves wide open spaces between buildings, with fewer trees too, and runs much faster. Landmarks always stay. Needs Apply & Restart.'),
       gcho('lod', 'Level of Detail', LMH, 'How far from you buildings keep full facade detail (windows, trim) before turning into simple blocks. Lower is a big frame-rate gain.'),
       gcho('drawDist', 'Draw Distance', [['low', 'Low (0.5 km)'], ['medium', 'Medium (1.3 km)'], ['high', 'High (2.2 km)'], ['full', 'Full island']], 'How much of the city is built around the start. Smaller loads faster and uses far less memory.'),
     ],

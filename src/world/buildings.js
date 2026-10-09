@@ -33,6 +33,7 @@ function tintJitter(rnd, base, amt = 0.08) {
 // opts.force: [{x, z, arch(rnd, lot) -> partial archetype}] overrides the archetype of the lot containing (x,z)
 export function generateBuildings(blocks, seed = 1234, opts = {}) {
   const rnd = mulberry32(seed);
+  const KEEP = globalThis.__BLD_KEEP ?? 1; // Options > Graphics > City Density: share of ordinary lots that get a building (landmarks / forced lots always stay)
   const tiles = new Map();
   const ctx = {
     boxes: [],       // building mass AABBs {min:[x,y,z], max:[x,y,z]} (map / legacy consumers)
@@ -105,10 +106,12 @@ export function generateBuildings(blocks, seed = 1234, opts = {}) {
         }
       });
       if (skip) continue;
+      if (KEEP < 1 && !lot.reserved && !(opts.force || []).some(f => f.x > lot.x0 && f.x < lot.x1 && f.z > lot.z0 && f.z < lot.z1) && (Math.abs(Math.sin(lot.cx * 12.9898 + lot.cz * 78.233) * 43758.5453) % 1) > KEEP) continue; // open space instead of a building
       const lr = lot.subK ? mulberry32((Math.floor(lot.cx * 9.1) * 73856093) ^ (Math.floor(lot.cz * 6.7) * 19349663) ^ 0x3c1d) : rnd; // (skyline r10) extra sub-towers: own stream
       let arch = chooseArch(lot, b, lr);
       arch = residentialArch(lot, district(lot.cx, lot.cz), mulberry32((Math.floor(lot.cx * 7.3) * 73856093) ^ (Math.floor(lot.cz * 5.1) * 19349663)), arch) ?? arch; // park agent: UWS / UES / Harlem (own rnd: the city's stream is untouched)
       const f = (opts.force || []).find(f => f.x > lot.x0 && f.x < lot.x1 && f.z > lot.z0 && f.z < lot.z1);
+      if (f) lot.force = true; // forced (landmark) lots are never thinned by City Density
       if (f) arch = { ...arch, ...f.arch(lr, lot) };
       if (!f && arch.shape === undefined) arch.shape = pickShape(lot, arch, b, lr);
       if (!f) streetVary(lot, arch, placedMid); // (street r12) facing-facade decorrelation + per-building module variety (own hash)
@@ -1373,6 +1376,8 @@ function zoneBelts(F, S, mg, ft0, A) {
 }
 
 function emitBuilding(lot, A, b, r, tile, ctx) {
+  { const K = globalThis.__BLD_KEEP ?? 1; // City Density: every build path ends here, so thin here too (sub-lots, diagonal pieces); landmarks and reserved lots stay
+    if (K < 1 && !lot.reserved && !lot.force && (Math.abs(Math.sin(lot.cx * 12.9898 + lot.cz * 78.233) * 43758.5453) % 1) > K) return; }
   const { S, Z } = ctx;
   const T = tile(lot.cx, lot.cz);
   const F = T.fac, D = T.det, FL = T.lod;
