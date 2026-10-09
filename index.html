@@ -7,7 +7,7 @@
 /* options screen: saved world radius + crowd size (settings.gfx), read before anything is built */
 try{var st=JSON.parse(localStorage.getItem('spiderbench.save.v1')||'null'),g=st&&st.settings&&st.settings.gfx;if(g){var u2=new URL(location.href);
 if(!u2.searchParams.has('lite')&&!u2.searchParams.has('full')){var R={low:500,medium:1300,high:2200,full:0}[g.drawDist];if(R===0)delete globalThis.__LITE_R;else if(R)globalThis.__LITE_R=R}
-var P={low:.35,medium:.8,high:1}[g.population];if(P)globalThis.__POP_SCALE=P;var T={off:0,low:.4,medium:1,high:1.4}[g.traffic];if(T!=null)globalThis.__TRAFFIC_SCALE=T;globalThis.__PARK_KEEP=T==null?1:Math.min(1,T)*.75}else if(matchMedia('(pointer:coarse)').matches){globalThis.__POP_SCALE=.35;globalThis.__TRAFFIC_SCALE=.4;globalThis.__PARK_KEEP=.3;globalThis.__LOD_NEAR=150;globalThis.__LOD_FAR=330}}catch(e){}</script>
+var P={low:.35,medium:.8,high:1}[g.population];if(P)globalThis.__POP_SCALE=P;var T={off:0,low:.4,medium:1,high:1.4}[g.traffic];if(T!=null)globalThis.__TRAFFIC_SCALE=T;globalThis.__PARK_KEEP=T==null?1:Math.min(1,T)*.75}else if(matchMedia('(pointer:coarse)').matches){globalThis.__POP_SCALE=.35;globalThis.__TRAFFIC_SCALE=.4;globalThis.__PARK_KEEP=.3;globalThis.__LOD_NEAR=100;globalThis.__LOD_FAR=260}}catch(e){}</script>
 <title>Spiderbench</title>
 <link rel="icon" href="data:," />
 <link rel="preload" as="image" href="/assets/loading/01.webp" fetchpriority="high" />

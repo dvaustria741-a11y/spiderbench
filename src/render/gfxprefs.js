@@ -6,7 +6,7 @@ export const SAVE_KEY = 'spiderbench.save.v1';
 
 export const GFX_FIELDS = ['shadows', 'shadowRes', 'shadowDist', 'aa', 'ao', 'reflections', 'gi', 'shafts', 'clouds', 'population', 'drawDist'];
 export const LIVE_FIELDS = ['bloom', 'traffic', 'lod'];
-export const LOD_NEAR = { low: 150, medium: 300, high: 650 }; // metres: beyond this, buildings are drawn as simple blocks
+export const LOD_NEAR = { low: 100, medium: 240, high: 650 }; // metres: beyond this, buildings are drawn as simple blocks
 
 // per-preset values for every field (Low / Medium / High); a settings.gfx that matches none of them is "Custom"
 export const GFX_PRESETS = {
