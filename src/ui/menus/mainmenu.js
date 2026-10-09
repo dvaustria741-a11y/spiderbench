@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { createOptionsPanel } from './options.js';
 import './options.css';
+import { MAP, chooseMap } from '../../world/activemap.js';
 
 const BASE = (import.meta.env?.BASE_URL || '/') + 'assets/ui/menu/';
 const FB = {
@@ -107,6 +108,26 @@ export function createMainMenu(sys, ctx) {
     return { progress: p => L.progress(p), close: () => { L.el.style.transition = 'opacity .4s'; L.el.style.opacity = 0; setTimeout(() => L.el.remove(), 450); } };
   }
   const nextFrame = () => new Promise(r => requestAnimationFrame(r));
+  // ---- map chooser (Play): Manhattan (classic, heavy) or the open city (light, fast). The map is built at startup, so a
+  // different choice is saved and the page reloads straight into the game on that map.
+  const MAPS = [
+    { id: 'classic', name: 'Manhattan', desc: 'The full dense city: thousands of buildings, traffic and crowds. Needs a strong device.' },
+    { id: 'open', name: 'Open City', desc: 'A big city with wide open spaces, far fewer buildings and trees. Much faster on phones.' },
+  ];
+  function chooseMapThenPlay() {
+    if (!active || document.getElementById('mapsel')) return; audio.sfx.select();
+    const d = document.createElement('div'); d.id = 'mapsel';
+    d.style.cssText = 'position:fixed;inset:0;z-index:1900;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#fff';
+    d.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;width:min(92vw,560px)"><div style="font:800 20px system-ui;letter-spacing:.08em;text-transform:uppercase;text-align:center">Choose a map</div>${MAPS.map(m => `<button data-map="${m.id}" style="all:unset;cursor:pointer;background:#1b1b1b;border:2px solid ${m.id === MAP ? '#e3262f' : '#333'};border-radius:12px;padding:14px 18px"><div style="font:800 18px system-ui">${m.name}${m.id === MAP ? ' <span style="font:600 12px system-ui;opacity:.6">(last played)</span>' : ''}</div><div style="font:500 13px/1.4 system-ui;opacity:.75;margin-top:4px">${m.desc}</div></button>`).join('')}<button data-map="" style="all:unset;cursor:pointer;text-align:center;opacity:.6;font:600 13px system-ui;padding:6px">Cancel</button></div>`;
+    document.body.appendChild(d);
+    d.addEventListener('click', e => {
+      const b = e.target.closest('[data-map]'); if (!b) return; const id = b.dataset.map; d.remove();
+      if (!id) return;
+      chooseMap(id);
+      if (ctx.menuOnly || id === MAP) { play(); return; } // title-only boot: play() reloads into the full boot, which reads the saved map
+      try { const u = new URL(location.href); u.searchParams.set('go', '1'); location.replace(u); } catch (err) { location.reload(); } // switch map: full reload, then straight into the game
+    });
+  }
   async function play() {
     if (!active) return; active = false; audio.sfx.select(); audio.sfx.open?.();
     const L = loadingScreen(); window.__sysMenu = { open: false };
@@ -137,7 +158,7 @@ export function createMainMenu(sys, ctx) {
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a;
-    if (a === 'play') play(); else if (a === 'options') openOptions(); else if (a === 'profile') openSuits(); else if (a === 'suits') { audio.sfx.select(); profile(); } else if (a === 'news') { audio.sfx.select(); about(); }
+    if (a === 'play') chooseMapThenPlay(); else if (a === 'options') openOptions(); else if (a === 'profile') openSuits(); else if (a === 'suits') { audio.sfx.select(); profile(); } else if (a === 'news') { audio.sfx.select(); about(); }
     else if (a === 'photo') { audio.sfx.select(); modal(`<h3>${a === 'suits' ? 'Suits' : 'Photo Mode'}</h3><p>Press Play, then open the pause menu (Esc, or the pause button on a phone) to use ${a === 'suits' ? 'the Suits tab' : 'Photo Mode'}.</p>`); }
   });
   for (const b of el.querySelectorAll('[data-a]')) b.addEventListener('mouseenter', () => audio.sfx.hover());
@@ -146,7 +167,7 @@ export function createMainMenu(sys, ctx) {
   flow.onKey((e, mode) => {
     if (!active || mode !== 'menu') return false;
     if (e.code === 'Escape') { if (info.classList.contains('on')) info.classList.remove('on'); else if (optsHost.classList.contains('on')) { if (!options.back()) closeOptions(); } return true; }
-    if ((e.code === 'Enter' || e.code === 'Space') && !optsHost.classList.contains('on') && !info.classList.contains('on')) { play(); return true; }
+    if ((e.code === 'Enter' || e.code === 'Space') && !optsHost.classList.contains('on') && !info.classList.contains('on')) { chooseMapThenPlay(); return true; }
     return true;
   });
   return { el, show, play, get active() { return active; } };

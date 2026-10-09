@@ -6,6 +6,7 @@ The code, shaders, procedural city, Blender-built models and generated textures 
 
 ## What's in it
 - **Traversal:** third-person web-swinging, wall-running, perching, zipping and diving, driven by a custom physics and animation state machine.
+- **Maps:** two maps, picked when you press Play: Manhattan (the full dense city below) and Open City (wide open spaces, far fewer buildings and trees, built for phones; `src/world/citylite.js` + `openmap.js`). `?map=open` or `?map=classic` forces one.
 - **City:** a procedural Manhattan-style island with an authored street network, including Broadway, Greenwich Village and the Financial District. It has thousands of buildings, rooftops, parks, Times Square, bridges, traffic and pedestrians.
 - **Rendering:** a Three.js (WebGL2) pipeline with cascaded shadows, screen-space GI, AO and reflections, bloom, TAA, motion blur, fixed time-of-day presets (including night and rain), and a day/night city.
 - **Assets:** character, vehicle and pedestrian models and animation clips built by Blender Python scripts, plus AI-generated textures and ad art. Advertised brands are invented, apart from in-universe Marvel names such as the Daily Bugle and Oscorp.

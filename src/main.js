@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { createPipeline } from './render/pipeline.js';
 import { createLighting } from './render/lighting.js';
 import { buildMenuWorld } from './world/menuworld.js';
+import { MAP } from './world/activemap.js'; // 'classic' (Manhattan) or 'open' (open fast city), chosen on the main menu
 import { createPlayer } from './player/player.js';
 import { createInput } from './player/input.js';
 import { createHud } from './ui/hud.js';
@@ -53,7 +54,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 150000);
 
 const lighting = createLighting({ renderer, scene });
-const world = menuOnly ? buildMenuWorld() : await import('./world/city.js').then(m => m.buildCity({ scene, renderer }));
+const world = menuOnly ? buildMenuWorld() : await (MAP === 'open' ? import('./world/citylite.js') : import('./world/city.js')).then(m => m.buildCity({ scene, renderer }));
 const input = createInput(renderer.domElement);
 await boot.stage('player');
 const player = await createPlayer({ scene, world, camera, input, renderer });

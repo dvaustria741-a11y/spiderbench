@@ -16,7 +16,7 @@
 // crime = { id, type:'mugging'|'bankAlarm'|'carChase', title, pos:Vector3 (live), district, state, claimed, t, meter,
 //           enemies, victim, claim() }
 import * as THREE from 'three';
-import { G, streetsAt, avenues, onLand } from '../../world/layout.js';
+import { G, streetsAt, avenues, onLand } from '../../world/activemap.js';
 import { on, emit } from './events.js';
 import { roadGraph } from './route.js';
 import { loadVehicleModels } from '../../world/vehicles.js';

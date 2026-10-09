@@ -1,7 +1,7 @@
 // OWNER: systems engineer. GPS routing on the Manhattan street grid (Dijkstra over avenue x street intersections).
 // Segments are only used if they're actually drivable road (streetsAt midpoint = avenue/street/intersection/drive),
 // so routes go around the park and the closed T-junction street.
-import { G, avenues, streets, streetsAt } from '../../world/layout.js';
+import { G, avenues, streets, streetsAt } from '../../world/activemap.js';
 
 let graph = null;
 function buildGraph() {

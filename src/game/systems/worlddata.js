@@ -3,9 +3,9 @@
 // Everything is placed with world.raycast / world.groundHeight so it sits on RENDERED surfaces, and seeded so
 // save-game ids stay stable between sessions.
 import * as THREE from 'three';
-import { G, avenues, streets, streetsAt, mulberry32, inPark, stHalfAt } from '../../world/layout.js'; // (layout2 r9) stHalfAt
+import { G, avenues, streets, streetsAt, mulberry32, inPark, stHalfAt, MAP } from '../../world/activemap.js'; // (layout2 r9) stHalfAt
 
-export const DISTRICTS = [
+const CLASSIC_DISTRICTS = [
   { id: 'uws', name: 'Upper West Side', rect: { x0: -800, x1: -234, z0: -2151, z1: -569 }, anchor: [-450, -1250], landmark: 'Baxter Building',
     lmDesc: 'Home of a certain fantastic family. The rooftop lab still hums at night.', photoHint: 'Brownstones and a long avenue heading north. Aunt May used to shop here.' },
   { id: 'park', name: 'Central Park', rect: { x0: -234, x1: 234, z0: -2151, z1: -569 }, anchor: [0, -760], landmark: 'Sheep Meadow',
@@ -25,6 +25,16 @@ export const DISTRICTS = [
   { id: 'harlem', name: 'Harlem', rect: { x0: -800, x1: 900, z0: -3500, z1: -2151 }, anchor: [0, -2750], landmark: 'Apollo Theater',
     lmDesc: 'Amateur Night has launched a thousand careers. The marquee still lights up the street.', photoHint: 'Brownstone stoops and a marquee that lights up the whole block.' },
 ];
+
+// Open map (3 x 3 regions over x -1400..1400, z -850..850); same ids / landmark names so saves stay compatible
+const R = (x0, x1, z0, z1) => ({ x0, x1, z0, z1 });
+const OPEN_DISTRICTS = CLASSIC_DISTRICTS.map((d, k) => {
+  const col = [0, 1, 2, 0, 1, 2, 0, 1, 2][k], row = [0, 0, 0, 1, 1, 1, 2, 2, 2][k];
+  const xs = [-2000, -470, 470, 2000], zs = [-1500, -283, 283, 1500];
+  const rect = R(xs[col], xs[col + 1], zs[row], zs[row + 1]);
+  return { ...d, rect, anchor: [(Math.max(xs[col], -1300) + Math.min(xs[col + 1], 1300)) / 2, (Math.max(zs[row], -800) + Math.min(zs[row + 1], 800)) / 2] };
+});
+export const DISTRICTS = MAP === 'open' ? OPEN_DISTRICTS : CLASSIC_DISTRICTS;
 
 const ITEMS = [
   ['Science Fair Ribbon', 'First place, Midtown Science High. The volcano was Harry\'s idea.'], ['Library Card', 'Overdue since sophomore year. Sorry, Ms. Kemper.'],
@@ -203,6 +213,7 @@ export function buildWorldData(world) {
 }
 
 function stationName(x, z) {
+  if (MAP === 'open') { const a = Math.round(x / G.AV_SP) + 7, k = Math.round(z / G.ST_SP) + 5; return `${String.fromCharCode(65 + Math.max(0, Math.min(25, a)))}-${k + 1} Junction`; }
   const av = Math.round(x / G.AV_SP);
   const avNames = { '-6': '14th Av', '-5': '13th Av', '-4': '12th Av', '-3': '11th Av', '-2': '10th Av', '-1': '8th Av', '0': '6th Av', '1': '5th Av', '2': 'Lexington Av' };
   const st = Math.round(59 - (z + 480) / 80 * 2.5);

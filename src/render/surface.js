@@ -13,7 +13,7 @@
 //     warm light bounced from the sunlit street and facades onto down/side-facing surfaces)
 // Parameters live in the shared `ambShared` object (lighting.js updates it per time of day).
 import * as THREE from 'three';
-import { avenues, G, WIDE_ROADS, NARROW_STREETS, WIDE_ST_HALF, NARROW_ST_HALF, VREG, FREG } from '../world/layout.js'; // (zfix) kerb-gutter puddles
+import { avenues, G, WIDE_ROADS, NARROW_STREETS, WIDE_ST_HALF, NARROW_ST_HALF, VREG, FREG } from '../world/activemap.js'; // (zfix) kerb-gutter puddles
 
 export const ambShared = {
   grade: new THREE.Vector4(1, 1, 1, 0.6),   // rgb: ambient tint, w: ambient saturation
