@@ -805,8 +805,24 @@ export function buildTrees({ scene, T, spots, parkPaths }) {
   let t = 0;
   let rr = 0;
   let sunL = null;
+  // Draw Distance / Level of Detail cap for every tree pool (trunks, leaf cards, crowns, x-far blobs). The pools used to
+  // reach 2-3 km whatever the Options said (only the building blocks honoured Draw Distance), and the old "hide far
+  // trees on Low LOD" code in game/systems/index.js was undone by Pool.update (it re-sets mesh.visible on every repack).
+  // cap = min(Draw Distance radius, LOD far range); live: re-applied whenever either option changes.
+  let appliedCap = -1;
+  const applyCap = cap => {
+    appliedCap = cap;
+    for (const p of pools) {
+      p._far0 ??= p.far; p._fade0 ??= p.fadeOut; p._shadow0 ??= p.shadowFar;
+      p.far = Math.min(p._far0, cap);
+      p.fadeOut = p.far < p._far0 ? Math.max(4, Math.min(p._fade0, p.far * 0.08)) : p._fade0;
+      p.shadowFar = Math.min(p._shadow0, p.far);
+      p.last.set(1e9, 0, 0); p.written = -1; // force a repack with the new range / fade band
+    }
+  };
   out.update = (dt, cam) => {
     t += dt; leafMat.userData.uTime.value = t;
+    { const cap = Math.min(globalThis.__LITE_R || Infinity, globalThis.__LOD_FAR ?? Infinity); if (cap !== appliedCap) applyCap(cap); }
     // sun direction for the canopy shadow decals (the CSM's light 0; found once in the top-level scene)
     if (!sunL) { let top = scene; while (top.parent) top = top.parent; top.traverse(o => { if (!sunL && o.isDirectionalLight && o.castShadow) sunL = o; }); }
     if (sunL) shade.setSun(sunL);

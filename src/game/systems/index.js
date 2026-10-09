@@ -98,7 +98,7 @@ export function initSystems(ctx) {
     if (td != null) ctx.world.life?.traffic?.setDensity?.(td);
     globalThis.__LOD_NEAR = { low: 100, medium: 240, high: 650 }[s.gfx?.lod]; // live: city.js reads it every frame
     globalThis.__LOD_FAR = { low: 260, medium: 520 }[s.gfx?.lod] ?? Infinity; // tile LOD meshes beyond this are not drawn at all
-    { const lowLod = s.gfx?.lod === 'low', re = /^(farShore|hinterland|coast$|trees-(street-far|park|small)|trunks-(street-far|park|small))/; // far scenery beyond the phone-sized world
+    { const lowLod = s.gfx?.lod === 'low', re = /^(farShore|hinterland|coast$)/; // far scenery beyond the phone-sized world (trees are capped by distance in world/trees.js: Pool.update re-sets mesh.visible)
       for (const c of ctx.scene.getObjectByName('city')?.children || []) {
         if (re.test(c.name)) c.visible = !lowLod;
         if (c.isInstancedMesh && /^(trees|trunks)-/.test(c.name)) { c.userData._n0 ??= c.count; const bk = { normal: 1, sparse: 0.6, verysparse: 0.35 }[s.gfx?.buildings] ?? 1; c.count = Math.ceil(c.userData._n0 * (lowLod ? 0.4 : 1) * bk); } // thin the trees: Low LOD and City Density
