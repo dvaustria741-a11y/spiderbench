@@ -166,7 +166,7 @@ export async function buildCity({ scene, renderer }) {
   const flags = buildFlags({ scene: root, flags: gen.buildings.flags });
   await tick('life', 'coll');
   let time = 0;
-  let _fr = null, _pm = null, _sp = null; // (perf r2) tile pre-upload frustum
+  let _fr = null, _pm = null, _sp = null, _bx = null; // (perf r2) tile pre-upload frustum; _bx: tile box for view culling
 
   // ---------------------------------------------------------------- queries
   // citygeo: exact collision solids + zip points (contracts C2 / C4, see collision.js / zippoints.js)
@@ -256,11 +256,15 @@ export async function buildCity({ scene, renderer }) {
         let warmed = false; if (!_fr) { _fr = new THREE.Frustum(); _pm = new THREE.Matrix4(); _sp = new THREE.Sphere(); }
         _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm);
         const LN = globalThis.__LOD_NEAR ?? 650, DN = Math.min(450, LN * 0.8); // Options > Graphics > Level of Detail
+        // view culling of whole tiles (they were drawn by distance only, so tiles behind / beside the camera still cost vertex work).
+        // Only with shadows off: with shadows on, tiles outside the view still cast into it.
+        const cull = !renderer.shadowMap.enabled; if (cull && !_bx) _bx = new THREE.Box3(); let bg = null;
         for (const tm of tileMeshes) { // citylife: nearest-point tile distance; details dissolve by 450 m, cast shadows near only
           const d = Math.hypot(Math.max(0, Math.abs(camera.position.x - tm.cx) - 128), Math.max(0, Math.abs(camera.position.z - tm.cz) - 128));
-          if (tm.mesh) { detB.setVisible(tm.i, d < DN); detB.setShadow(tm.i, d < 160); } // (perf) batched tiles
+          let inV = true; if (cull) { _bx.min.set(tm.cx - 128, -5, tm.cz - 128); _bx.max.set(tm.cx + 128, 260, tm.cz + 128); inV = _fr.intersectsBox(_bx); }
+          if (tm.mesh) { detB.setVisible(tm.i, d < DN && inV); detB.setShadow(tm.i, d < 160); } // (perf) batched tiles
           // citygeo: full facade tile near, bare-mass LOD far (hysteresis 40 m)
-          if (tm.lod) { const near = tm.near ? d < LN + 40 : d < LN; tm.near = near; if (tm.fac) facB.setVisible(tm.i, near); lodB.setVisible(tm.i, !near && d < (globalThis.__LOD_FAR ?? Infinity)); }
+          if (tm.lod) { const near = tm.near ? d < LN + 40 : d < LN; tm.near = near; if (tm.fac) facB.setVisible(tm.i, near && inV); lodB.setVisible(tm.i, !near && inV && d < (globalThis.__LOD_FAR ?? Infinity)); }
           // (perf r2) pre-upload the tile about to appear (one vertex buffer per frame, tiles inside the view frustum
           // first), so the swap at 650-690 m / 450 m does not upload ~15-20 MB in one frame (100-150 ms hitches)
           if (!warmed && d < LN + 200 && ((tm.fac && !tm.warmF && !tm.near) || (tm.mesh && !tm.warmD && d >= DN && d < DN + 150))) {
@@ -268,9 +272,10 @@ export async function buildCity({ scene, renderer }) {
             if (_fr.intersectsSphere(_sp)) {
               if (tm.fac && !tm.warmF && !tm.near) { if (facB.warm(tm.i)) warmed = true; else tm.warmF = true; } // one buffer per frame
               else if (detB.warm(tm.i)) warmed = true; else tm.warmD = true;
-            }
+            } else if (cull && !bg) bg = tm; // out of view: upload it later (below) so turning the camera does not hitch
           }
         }
+        if (cull && !warmed && bg) { const tm = bg; if (tm.fac && !tm.warmF && !tm.near) { if (!facB.warm(tm.i)) tm.warmF = true; } else if (!detB.warm(tm.i)) tm.warmD = true; }
       }
     },
   };
