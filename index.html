@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
-<script>try{var u=new URL(location.href);if(matchMedia("(pointer:coarse)").matches&&!u.searchParams.has("q")){u.searchParams.set("q","low");history.replaceState(null,"",u)}var c=matchMedia("(pointer:coarse)").matches;if(u.searchParams.has("lite"))globalThis.__LITE_R=+u.searchParams.get("lite")||1300;else if(c&&!u.searchParams.has("full"))globalThis.__LITE_R=500}catch(e){}
+<script>/* start-up mode: the first launch boots MENU-ONLY (hero + sky + menus, no city assets); Play reloads with ?go into the full boot, which builds
+   the city and starts the game by itself. ?eager (or ?shot / ?playtest / ?nomenu / ?noboot / ?cam / ?vp) keeps the old behaviour: build everything first. */
+try{var q0=new URLSearchParams(location.search);globalThis.__GO=q0.has('go');globalThis.__MENU_ONLY=!(globalThis.__GO||['eager','shot','playtest','nomenu','noboot','cam','vp'].some(function(k){return q0.has(k)}))}catch(e){}
+try{var u=new URL(location.href);if(matchMedia("(pointer:coarse)").matches&&!u.searchParams.has("q")){u.searchParams.set("q","low");history.replaceState(null,"",u)}var c=matchMedia("(pointer:coarse)").matches;if(u.searchParams.has("lite"))globalThis.__LITE_R=+u.searchParams.get("lite")||1300;else if(c&&!u.searchParams.has("full"))globalThis.__LITE_R=500}catch(e){}
 /* options screen: saved world radius + crowd size (settings.gfx), read before anything is built */
 try{var st=JSON.parse(localStorage.getItem('spiderbench.save.v1')||'null'),g=st&&st.settings&&st.settings.gfx;if(g){var u2=new URL(location.href);
 if(!u2.searchParams.has('lite')&&!u2.searchParams.has('full')){var R={low:500,medium:1300,high:2200,full:0}[g.drawDist];if(R===0)delete globalThis.__LITE_R;else if(R)globalThis.__LITE_R=R}
@@ -71,6 +74,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:bl
 // current stage on the compositor, so it keeps moving while a stage blocks the main thread. ?shot / ?playtest / ?noboot: no screen.
 (() => {
   const LOGO = '/assets/ui/menu/logo.png';
+  const MO = !!window.__MENU_ONLY, GO = !!window.__GO; // MO: first start, no city (only the hero + sky load); GO: Play was pressed, full load then straight into the game
   const NAMES = ['spiderman.glb','walls_col.jpg','walls_nrm.webp','walls_hao.jpg','asphalt_col.png','asphalt_nrm.png','asphalt_macro.png','asphalt_decals.webp',
     'sidewalk_col.png','sidewalk_nrm.png','roof_col.png','roof_nrm.png','grass_col.png','grass_nrm.png','water_nrm.png','curb_col.webp','bark_col.webp','bark_nrm.webp',
     'leaves.png','detail_nrm.png','noise.png','markings.png','signs.png','interiors.png','vehicles.glb','vehicles_atlas.png','vehicles_atlas2.webp','props.glb',
@@ -79,10 +83,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:bl
     'music_orch_swing.ogg','sfx_trav.ogg','sfx_ui.ogg','spiderbench-condensed-800.ttf'];
   const imgFallback = 'onerror="this.replaceWith(Object.assign(document.createElement(\'b\'),{textContent:\'SPIDERBENCH\'}))"';
   const logoImg = cls => `<img class="${cls}" src="${LOGO}" alt="" draggable="false" ${imgFallback}>`;
-  function create({ id = '', intro = false } = {}) {
+  const NAMES_MENU = ['spiderman.glb', 'suit_normal.png', 'suit_weave_hex.png', 'suit_weave_knit.png', 'logo.png', 'play.png', 'options.png', 'profile.png', 'photo.png', 'news.png', 'sfx_ui.ogg', 'spiderbench-condensed-800.ttf'];
+  function create({ id = '', intro = false, menu = false } = {}) {
     const el = document.createElement('div'); el.className = 'ob'; if (id) el.id = id;
-    const n = NAMES.length, d = -(Math.random() * n * 0.42).toFixed(2) + 's';
-    el.innerHTML = `<div class="asset" style="--n:${n};--d:${d}"><ul>${NAMES.map(x => `<li>${x}</li>`).join('')}</ul></div>
+    const NAMES_ = menu ? NAMES_MENU : NAMES, n = NAMES_.length, d = -(Math.random() * n * 0.42).toFixed(2) + 's';
+    el.innerHTML = `<div class="asset" style="--n:${n};--d:${d}"><ul>${NAMES_.map(x => `<li>${x}</li>`).join('')}</ul></div>
       <div class="logo">${logoImg('base')}<div class="fill">${logoImg('')}</div></div>
       <div class="bar"><i></i></div><div class="msg" role="alert"></div>`
       + (intro ? `<div class="intro"><div class="card" style="--at:.15s">${logoImg('')}</div>
@@ -107,12 +112,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:bl
   const q = new URLSearchParams(location.search);
   const noop = () => Promise.resolve();
   if (q.has('shot') || q.has('playtest') || q.has('noboot')) { window.__boot = { stage: noop, sub() {}, done() {} }; return; }
-  const L = create({ id: 'boot', intro: true }), el = L.el;
+  const L = create({ id: 'boot', intro: !GO, menu: MO }), el = L.el;
   el.setAttribute('role', 'progressbar'); el.setAttribute('aria-label', 'Loading'); el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', '100'); el.setAttribute('aria-valuenow', '0');
-  const ORDER = ['boot', 'tex', 'gen', 'build', 'ground', 'props', 'life', 'coll', 'player', 'shaders', 'frame'];
+  const ORDER = MO ? ['boot', 'player', 'shaders', 'frame'] : ['boot', 'tex', 'gen', 'build', 'ground', 'props', 'life', 'coll', 'player', 'shaders', 'frame'];
+  const KEY = MO ? 'spiderbench.boot2m' : 'spiderbench.boot2';
   // defaults (ms) measured on the dev machine; replaced by this machine's last load. (The shader warm-up now runs when Play is pressed.)
-  const DEF = { boot: 1400, tex: 800, gen: 4600, build: 7200, ground: 2300, props: 1300, life: 1250, coll: 2400, player: 800, shaders: 900, frame: 1500 };
-  let T = { ...DEF }; try { Object.assign(T, JSON.parse(localStorage.getItem('spiderbench.boot2') || '{}')); } catch (e) { /* private mode */ }
+  const DEF = { boot: 1400, tex: 800, gen: 4600, build: 7200, ground: 2300, props: 1300, life: 1250, coll: 2400, player: MO ? 1800 : 800, shaders: 900, frame: 1500 };
+  let T = { ...DEF }; try { Object.assign(T, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* private mode */ }
   const total = ORDER.reduce((s, k) => s + T[k], 0);
   const startOf = k => ORDER.slice(0, ORDER.indexOf(k)).reduce((s, n) => s + T[n], 0) / total;
   const seen = {}; let cur = null, curAt = 0, frac = 0, act = 0; // act: last sign of progress (stage or sub)
@@ -150,8 +156,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:bl
   function done() {
     if (finished) return; finished = true;
     if (cur) seen[cur] = performance.now() - curAt;
-    try { const m = {}; for (const k of ORDER) m[k] = Math.round(seen[k] != null ? (T[k] + 2 * seen[k]) / 3 : T[k]); localStorage.setItem('spiderbench.boot2', JSON.stringify(m)); } catch (e) { /* ignore */ }
+    try { const m = {}; for (const k of ORDER) m[k] = Math.round(seen[k] != null ? (T[k] + 2 * seen[k]) / 3 : T[k]); localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) { /* ignore */ }
     set(1, 300, 'ease-out');
+    // Play was pressed on the title screen: no intro cards / Touch to Start. The start-up screen stays up until the game's own
+    // loading screen (mainmenu.js play(), above this one) has faded in, then it is released (window.__boot.release())
+    if (GO) { window.__boot.release = () => { removeEventListener('keydown', onKey, true); el.remove(); }; return; }
     // wait for the intro cards (4 s) so Touch to Start never cuts them off
     const wait = Math.max(450, 4000 - performance.now());
     setTimeout(() => { el.classList.add('ready'); el.style.cursor = 'pointer'; }, wait);

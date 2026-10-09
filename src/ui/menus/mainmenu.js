@@ -111,6 +111,12 @@ export function createMainMenu(sys, ctx) {
     if (!active) return; active = false; audio.sfx.select(); audio.sfx.open?.();
     const L = loadingScreen(); window.__sysMenu = { open: false };
     await new Promise(r => setTimeout(r, 280)); // let the loading screen fade in over the menu
+    if (ctx.menuOnly) { // first start: only the hero + sky are loaded (no city yet). Reload into the full boot (?go): it builds the world behind the start-up screen, then comes back here and plays
+      L.progress(0.02);
+      try { const u = new URL(location.href); u.searchParams.set('go', '1'); location.replace(u); } catch (e) { location.reload(); }
+      return;
+    }
+    window.__boot?.release?.(); // (arrived from ?go) the start-up screen is no longer needed: the Play loading screen is fully in
     el.classList.remove('on', 'fadeout');
     const W = ctx.warmup; // shader programs: queued all at once, the bar follows how many have linked (first Play only; later it is empty)
     if (W) { W.rescan(); W.flush(); await W.settle(k => L.progress(0.04 + k * 0.76)); }

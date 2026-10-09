@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { createPipeline } from './render/pipeline.js';
 import { createLighting } from './render/lighting.js';
-import { buildCity } from './world/city.js';
+import { buildMenuWorld } from './world/menuworld.js';
 import { createPlayer } from './player/player.js';
 import { createInput } from './player/input.js';
 import { createHud } from './ui/hud.js';
@@ -24,6 +24,9 @@ const params = new URLSearchParams(location.search);
 const shotName = params.get('shot');
 // start-up screen (index.html, Overpeak style): progress bar + asset names; shows Touch to Start once the first frames and the game systems are up
 const boot = window.__boot || { stage: async () => {}, sub() {}, done() {} };
+// first start = menu-only boot (hero + sky + menus, no city): window.__MENU_ONLY is set in index.html. Play reloads into the
+// full boot (?go), which builds the city behind the loading screen and then starts the game by itself (window.__GO).
+const menuOnly = !!window.__MENU_ONLY;
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, reversedDepthBuffer: true });
 renderer.setPixelRatio(globalThis.__LITE_R ? 1 : Math.min(devicePixelRatio, 1.5));
@@ -50,12 +53,12 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 150000);
 
 const lighting = createLighting({ renderer, scene });
-const world = await buildCity({ scene, renderer });
+const world = menuOnly ? buildMenuWorld() : await import('./world/city.js').then(m => m.buildCity({ scene, renderer }));
 const input = createInput(renderer.domElement);
 await boot.stage('player');
 const player = await createPlayer({ scene, world, camera, input, renderer });
 await boot.stage('shaders');
-const hud = createHud({ player, world, camera });
+const hud = menuOnly ? { setVisible() {}, setObjective() {}, showHelp() {}, update() {}, minimapFrame: null, objective: null } : createHud({ player, world, camera }); // title screen: no HUD / minimap
 const pipeline = createPipeline({ renderer, scene, camera, lighting });
 
 addEventListener('resize', () => {
@@ -63,11 +66,11 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); pipeline.setSize(innerWidth, innerHeight);
 });
 
-const ctx = { THREE, renderer, scene, camera, lighting, world, player, hud, pipeline, input };
+const ctx = { THREE, renderer, scene, camera, lighting, world, player, hud, pipeline, input, menuOnly };
 import('./ui/perf.js').then(m => m.initPerf(ctx)).catch(() => {});
 ctx.systems = ctx.systems || []; // C5: game systems (src/game/**) push {update(dt)} here
 window.__ctx = ctx;
-if (matchMedia('(pointer: coarse)').matches || params.has('touch')) import('./ui/touch.js').then(m => m.initTouch(ctx)).catch(e => console.error('[touch] init failed', e));
+if (!menuOnly && (matchMedia('(pointer: coarse)').matches || params.has('touch'))) import('./ui/touch.js').then(m => m.initTouch(ctx)).catch(e => console.error('[touch] init failed', e));
 // (perf r3) queue every shader program the game can draw (main pass + the river mirror's unshadowed variant + the
 // post passes) before the first frame: they link in parallel on the driver's threads during the loading frame instead
 // of one by one later, each freezing the game for 0.2-6 s the first time its material came into view
@@ -80,10 +83,16 @@ if (warmup) { lighting.update(camera); pipeline.prepareMaterials?.(); warmup.res
 await boot.stage('frame');
 let framesDrawn = 0;
 const systemsReady = shotName ? Promise.resolve() : import('./game/systems/index.js').then(m => m.initSystems(ctx)).catch(e => console.error('[systems] init failed', e)) // open-world systems (C5)
-  .then(() => import('./game/combat/index.js')).then(m => m.initCombat(ctx)).catch(e => console.error('[combat] init failed', e)) // combat (C5)
+  .then(() => menuOnly ? null : import('./game/combat/index.js').then(m => m.initCombat(ctx))).catch(e => console.error('[combat] init failed', e)) // combat (C5); not needed on the title screen
   .then(() => warmup?.rescan()); // (perf r3) + the meshes the systems / combat added (trickled by warmup.step)
 // the loading screen goes once the game systems (HUD, save position) are in and a few frames have been drawn
-systemsReady.then(async () => { boot.sub(0.8); while (framesDrawn < 4) await new Promise(r => requestAnimationFrame(r)); boot.done(); });
+systemsReady.then(async () => {
+  boot.sub(0.8); while (framesDrawn < 4) await new Promise(r => requestAnimationFrame(r)); boot.done();
+  if (window.__GO && !menuOnly) { // Play was pressed on the title screen: the world is built, start the game (its own loading screen takes over from the start-up one)
+    try { const u = new URL(location.href); if (u.searchParams.has('go')) { u.searchParams.delete('go'); history.replaceState(null, '', u); } } catch (e) { /* ignore */ }
+    ctx.sys?.mainMenu?.play?.();
+  }
+});
 ctx.timeScale = 1; // global game-time scale (combat hit-stop / slow-mo); ctx.realDt = unscaled frame time
 
 if (shotName) {
