@@ -32,7 +32,8 @@ const PLAYER_R = 0.5;        // player body half-width used by drivers (arms + s
 // (the edge inflow can't replace the cars driving out of the 640 m radius: ~1000 cars at load -> ~320 after 5 min with the
 // camera parked), so a stationary view emptied out whatever the spawn gaps were. The refill below tops links up out of view.
 const DENSITY = { av: 31, st: 44, ws: 20, dg: 41, dg1: 80, map: 27, br: 31 }; // br: bridge decks (roads.js BRIDGE_DENSITY) // dg1: one-way lower Broadway (2 lanes carry what 4 did)
-let densityScale = globalThis.__TRAFFIC_SCALE ?? 1; // boot value from Options > Graphics > Vehicle Density (index.html), so Low applies before any car is spawned
+let densityScale = globalThis.__TRAFFIC_SCALE ?? 1;
+let trafficOff = densityScale <= 0; // Vehicle Density Off: no moving cars, no parked / double-parked cars, no curb taxis or buses // boot value from Options > Graphics > Vehicle Density (index.html), so Low applies before any car is spawned
 
 export const VTYPES = {
   // (vehicles r1) real-world sizes of the Blender models (tools/blender/city_vehicles.py SPECS)
@@ -302,7 +303,7 @@ export function createTraffic({ scene, roads, phase, geos, mats, models = null }
     return qx * qx + qz * qz;
   };
   const populate = (L, first) => {
-    if (L.noSpawn) return;
+    if (L.noSpawn || trafficOff) return;
     const rng = mulberry32((L.id * 7919 + (L.gen = (L.gen || 0) + 1) * 104729) >>> 0);
     const spacing = L.kind === 'st' ? [8, 38] : L.kind === 'dr' ? [10, 38] : [6, 27]; // (street r2: denser avenues / streets)
     let s = 3 + rng() * 12 + (L.blockS < Infinity ? L.blockS + 6 : 0);
@@ -358,6 +359,7 @@ export function createTraffic({ scene, roads, phase, geos, mats, models = null }
   const onDiag = (x, z, pad, own = null) => { for (const g of DIAG_SEGS) { if (g === own) continue; const u = (x - g.ax) * g.ux + (z - g.az) * g.uz; if (u > -pad && u < g.len + pad && Math.abs(diagD(g, x, z)) < g.hw + pad) return true; } return false; };
   const parkedFor = (L) => {
     L.dbl = null;
+    if (trafficOff) return [];
     if (L.kind === 'dr' || L.noPark || (L.kind !== 'st' && L.lane !== 1)) return []; // (layout2) noPark: off-grid links
     const rng = mulberry32((L.id * 48271 + 11) >>> 0);
     const out = [];
@@ -948,7 +950,16 @@ export function createTraffic({ scene, roads, phase, geos, mats, models = null }
       zones.set(key, { x: pos.x, z: pos.z, r, until: time + ttl });
     },
     zones,
-    setDensity(k) { densityScale = Math.max(0, k); }, // (citylife junctions r3) 1 = 85 % of the original traffic
+    setDensity(k) {
+      densityScale = Math.max(0, k);
+      const off = densityScale <= 0;
+      if (off === trafficOff) return;
+      trafficOff = off;
+      if (off) { // live Off: drop every moving car and every parked / double-parked vehicle at once
+        for (const L of links) { for (const c of L.cars || []) c.dead = true; L.cars = []; L.parked = []; L.dbl = null; }
+        cars = cars.filter(c => !c.dead);
+      } else for (const L of links) L.parked = null; // back on: curb vehicles are rebuilt by the next stream tick
+    }, // (citylife junctions r3) 1 = 85 % of the original traffic
     alarm(pos, radius = 30) {
       zones.set('alarm:' + Math.round(pos.x / 10) + ',' + Math.round(pos.z / 10), { x: pos.x, z: pos.z, r: Math.min(radius, 22), until: time + 8 });
       for (const c of cars) {

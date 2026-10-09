@@ -95,7 +95,9 @@ export function initSystems(ctx) {
     ctx.fpsCap = FPS[s.frameRate] ?? 0;
     // Graphics: traffic density is live (the rest of the Graphics list applies after a restart)
     const td = { off: 0, low: 0.4, medium: 1, high: 1.4 }[s.gfx?.traffic];
-    if (td != null) ctx.world.life?.traffic?.setDensity?.(td);
+    if (td != null) { ctx.world.life?.traffic?.setDensity?.(td); ctx.world.highways?.setTraffic?.(td > 0); }
+    if (s.gfx?.population) ctx.world.life?.crowd?.setEnabled?.(s.gfx.population !== 'off'); // live: Off removes every pedestrian at once
+    { const sp = ctx.lighting?.sky?.params, off = s.gfx?.clouds === 'off'; if (sp && !!sp.cloudsOff !== off) { sp.cloudsOff = off; ctx.lighting.refresh?.(); } } // live: Off removes all clouds
     globalThis.__LOD_NEAR = { low: 100, medium: 240, high: 650 }[s.gfx?.lod]; // live: city.js reads it every frame
     globalThis.__LOD_FAR = { low: 260, medium: 520 }[s.gfx?.lod] ?? Infinity; // tile LOD meshes beyond this are not drawn at all
     { const lowLod = s.gfx?.lod === 'low', re = /^(farShore|hinterland|coast$)/; // far scenery beyond the phone-sized world (trees are capped by distance in world/trees.js: Pool.update re-sets mesh.visible)

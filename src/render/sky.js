@@ -157,6 +157,7 @@ uniform vec3 uCloudOffset;
 uniform float uSkyline;
 // (atmosphere r1) cloud look controls: sun-scatter gain, ambient gain, base-noise scale (1/km), cirrus amount
 uniform float uCloudSun, uCloudAmb, uCloudScale, uCirrus, uCloudErode, uCloudDetailScale;
+uniform float uCloudsOff; // Options > Dynamic Cloud: Off (1) skips the cloud march and the cirrus veil entirely
 uniform float uCloudBaseDark; // (atmosphere r2) 0..1 how much darker the flat cloud bases are than the tops
 uniform vec3 uFacadeAlb; uniform float uNight;
 float hash11(float p) { p = fract(p * .1031); p *= p + 33.33; p *= p + p; return fract(p); }
@@ -197,6 +198,7 @@ float cloudPhase(float mu, float k) {
 }
 // returns premultiplied cloud radiance (rgb) and transmittance (a)
 vec4 marchClouds(vec3 camM, vec3 rd, float jitter) {
+  if (uCloudsOff > 0.5) return vec4(0.0, 0.0, 0.0, 1.0);
   vec3 ro = vec3(camM.x * 0.001, RG + max(camM.y, 1.0) * 0.001, camM.z * 0.001);
   if (rd.y < -0.03) return vec4(0.0, 0.0, 0.0, 1.0);
   if (raySphere(ro, rd, RG).x > 0.0) return vec4(0.0, 0.0, 0.0, 1.0);
@@ -257,7 +259,7 @@ vec4 marchClouds(vec3 camM, vec3 rd, float jitter) {
 // (atmosphere r1) high cirrus / cirrostratus veil at ~8 km: one wind-stretched noise layer, thin and bright, sheared
 // into streaks (cheap: 2 lookups). Returns premultiplied radiance (rgb) and transmittance (a).
 vec4 cirrusLayer(vec3 camM, vec3 rd) {
-  if (uCirrus <= 0.0 || rd.y < 0.0) return vec4(0.0, 0.0, 0.0, 1.0);
+  if (uCirrus <= 0.0 || uCloudsOff > 0.5 || rd.y < 0.0) return vec4(0.0, 0.0, 0.0, 1.0);
   vec3 ro = vec3(camM.x * 0.001, RG + max(camM.y, 1.0) * 0.001, camM.z * 0.001);
   float t = raySphere(ro, rd, RG + 8.0).y;
   vec3 p = ro + rd * t; vec2 q = p.xz + uCloudOffset.xz * 0.4;
@@ -371,7 +373,7 @@ export function createSky(renderer, quality) {
     uCloudSun: { value: params.cloudSun }, uCloudAmb: { value: params.cloudAmb }, uCloudScale: { value: params.cloudScale },
     uHzK: { value: new THREE.Vector3(0.56, 0.63, 0.78) },
     uCirrus: { value: params.cirrus }, uCloudErode: { value: params.cloudErode }, uCloudDetailScale: { value: params.cloudDetailScale },
-    uCloudBaseDark: { value: params.cloudBaseDark },
+    uCloudBaseDark: { value: params.cloudBaseDark }, uCloudsOff: { value: 0 },
     uSunGlow: { value: new THREE.Vector4(0, 0, 0, 0) }, // (lighting2 r2)
     uOvercast: { value: 0 }, // (lighting2 r4)
   };
@@ -398,7 +400,8 @@ export function createSky(renderer, quality) {
     renderer.setRenderTarget(null);
   }
   function syncCloudUniforms() {
-    skyUniforms.uCloudCoverage.value = params.cloudCoverage;
+    skyUniforms.uCloudsOff.value = params.cloudsOff ? 1 : 0;
+    skyUniforms.uCloudCoverage.value = params.cloudsOff ? 0 : params.cloudCoverage; // also kills the projected cloud shadows
     skyUniforms.uCloudDensity.value = params.cloudDensity;
     skyUniforms.uCloudBottom.value = params.cloudBottom;
     skyUniforms.uCloudTop.value = params.cloudTop;

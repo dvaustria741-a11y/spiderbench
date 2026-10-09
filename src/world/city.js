@@ -209,7 +209,7 @@ export async function buildCity({ scene, renderer }) {
     bridgeLimit: null, bridgeDeckY,
     propAnchors: () => props.propAnchors?.() ?? [], // citylife: exact lamp-head / signal-mast / antenna tops + normals
     grabbables: (c, r) => props.grabbables?.(c, r) ?? [], grabProp: (id) => props.grab?.(id), releaseProp: (id) => props.release?.(id), // citylife: combat throwables
-    collision: grid, geoDebug,
+    collision: grid, geoDebug, highways,
     buildings: gen.boxes,
     footprints: gen.footprints,
     getMapFeatures: () => mapFeatures(blocks, gen),

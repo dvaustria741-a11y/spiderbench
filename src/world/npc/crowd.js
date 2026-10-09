@@ -1730,7 +1730,7 @@ export async function createCrowd({ scene, blocks, parkPaths, props, roads, phas
     if (a.park || a.elev || a.mode === 'path' || a.mode === 'sit' || a.mode === 'prom') return a.y ?? G.CURB_H; // (street r7) a.elev
     return onRoad(a.x, a.z) ? 0 : G.CURB_H;
   };
-  let frame = 0;
+  let frame = 0, popOn = (globalThis.__POP_SCALE ?? 1) > 0.01; // Options > Population Density Off boots with ~0
   const api = {
     agents, statics, pools: allPools,
     setPlayer(st) {
@@ -1746,9 +1746,12 @@ export async function createCrowd({ scene, blocks, parkPaths, props, roads, phas
       const z = zones.get(key) || {}; Object.assign(z, { x: pos.x, z: pos.z, r, active: true }); zones.set(key, z);
     },
     zones,
+    // Population Off (live): nobody is simulated or drawn (streamed people, park / bench / vendor statics, dogs)
+    setEnabled(on) { popOn = !!on; },
     update(dt, camera) {
       time += dt; frame++;
       uni.uTime.value = time;
+      if (!popOn) { for (const p of allPools) { p.begin(); p.end(); } dogs?.begin(); dogs?.end(); blobs?.begin(); blobs?.end(); return; }
       const cp = camera.position;
       const PF = api.prof, q0 = PF ? performance.now() : 0;
       if (backlog || cp.distanceToSquared(lastCam) > 100 || frame % 30 === 1) { stream(cp); lastCam.copy(cp); } // (perf r2) backlog

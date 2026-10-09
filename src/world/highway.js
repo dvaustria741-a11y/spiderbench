@@ -254,10 +254,12 @@ export function buildHighways({ scene, T, solids = null, models = null }) {
     const edge = Math.min(c.s, c.R.len - c.s), k2 = Math.min(1, Math.max(0, edge / 25));
     V.push(c.t, x, Y - (1 - k2) * 2.6, z, Math.atan2(-hz, hx), 0, c.col, c.seed); // sink into the 'tunnel portals' at the run ends
   };
-  let acc = 0, acc0 = false;
+  let acc = 0, acc0 = false, carsOn = (globalThis.__TRAFFIC_SCALE ?? 1) > 0; // Vehicle Density Off hides the highway cars too
   return {
     group, runs, cars: cars.length, treeSpots,
+    setTraffic(on) { carsOn = !!on; if (carsOn) acc0 = false; },
     update(dt, camera) {
+      if (!carsOn) { if (V && !acc0) { V.hide(); acc0 = true; } return; }
       // stream only while the waterfront can be on screen (aerial, or near a river)
       acc += dt;
       if (camera && camera.position.y < 60) {
