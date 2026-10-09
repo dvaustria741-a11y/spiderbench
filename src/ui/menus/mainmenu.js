@@ -96,34 +96,15 @@ export function createMainMenu(sys, ctx) {
     el.classList.remove('fadeout'); el.classList.add('on'); ctx.pipeline.resetHistory?.();
     window.__sysMenu = { open: true, tab: 'main' };
   }
-  // ---- loading screen shown between Play and the first game frame: the city is switched back on behind it and a few
-  // frames are rendered (shader compiles + first streaming happen here instead of as a freeze in the game)
-  const TIPS = ['Hold the swing button in the air to web-swing, and let go to release.', 'Tap zip to web-zip to the marked point and perch there.', 'Jump while swinging to release and launch off the swing.', 'Drag anywhere on the right side of the screen to look around.', 'Running slowly? Options > Graphics lets you lower Draw Distance, Shadows and Population.'];
+  // ---- Play loading screen (Overpeak style: black, asset names bottom-left, logo filling in bottom-right, red bar): the
+  // shader warm-up runs here, behind the screen, instead of at start-up; then the city is switched back on and a few
+  // frames are rendered (first streaming happens here instead of as a freeze in the game). Built by window.__ob (index.html)
   function loadingScreen() {
-    if (!document.getElementById('ld-css')) {
-      const st = document.createElement('style'); st.id = 'ld-css';
-      st.textContent = `#ld{position:fixed;inset:0;z-index:2000;background:#000;opacity:0;transition:opacity .25s;pointer-events:auto;color:#fff;font-family:system-ui,'Segoe UI',Roboto,sans-serif;touch-action:none}
-#ld.on{opacity:1}#ld .img{position:absolute;left:0;right:0;top:21%;bottom:21%;background:#111 center/cover no-repeat}
-#ld .tip{position:absolute;left:calc(2.4% + env(safe-area-inset-left));bottom:calc(3.5% + env(safe-area-inset-bottom));display:flex;gap:14px;align-items:center;background:#1b1b1b;border-radius:10px;padding:12px 18px 12px 14px;max-width:34%;font:500 clamp(11px,1.9vh,16px)/1.3 system-ui,sans-serif;transition:opacity .3s}
-#ld .tip i{flex:none;width:34px;height:34px;border-radius:50%;background:#fff;color:#e3262f;font:900 21px/34px Georgia,serif;text-align:center}
-#ld .mark{position:absolute;right:calc(4% + env(safe-area-inset-right));bottom:calc(3.5% + env(safe-area-inset-bottom));width:min(11vw,104px)}
-#ld .pct{position:absolute;right:calc(4% + env(safe-area-inset-right));bottom:calc(3.5% + env(safe-area-inset-bottom) + min(11vw,104px) * .95);font:700 13px system-ui;letter-spacing:.14em;opacity:.7;text-align:center;width:min(11vw,104px)}`;
-      document.head.appendChild(st);
-    }
-    const d = document.createElement('div'); d.id = 'ld';
-    const n = 1 + Math.floor(Math.random() * 6);
-    d.innerHTML = `<div class="img" style="background-image:url(${(import.meta.env?.BASE_URL || '/') + 'assets/loading/0' + n + '.webp'})"></div>
-      <div class="tip"><i>i</i><span></span></div><div class="pct">0%</div>
-      <svg class="mark" viewBox="0 0 100 90"><defs><clipPath id="ldc"><rect id="ldr" x="0" y="90" width="100" height="0"/></clipPath></defs><path d="M50 4 L96 86 H4 Z" fill="#e3262f" opacity=".28"/><path d="M50 4 L96 86 H4 Z" fill="#fff" clip-path="url(#ldc)"/></svg>`;
-    document.body.appendChild(d);
-    const tipEl = d.querySelector('.tip span'), r = d.querySelector('#ldr'), pct = d.querySelector('.pct');
-    let ti = Math.floor(Math.random() * TIPS.length); tipEl.textContent = TIPS[ti];
-    const tt = setInterval(() => { d.querySelector('.tip').style.opacity = 0; setTimeout(() => { tipEl.textContent = TIPS[ti = (ti + 1) % TIPS.length]; d.querySelector('.tip').style.opacity = 1; }, 300); }, 4200);
-    requestAnimationFrame(() => d.classList.add('on'));
-    return {
-      progress(p) { p = Math.max(0, Math.min(1, p)); r.setAttribute('y', 90 * (1 - p)); r.setAttribute('height', 90 * p); pct.textContent = Math.round(p * 100) + '%'; },
-      close() { clearInterval(tt); d.classList.remove('on'); setTimeout(() => d.remove(), 300); },
-    };
+    const L = window.__ob?.create({ id: 'ld' });
+    if (!L) return { progress() {}, close() {} };
+    L.el.style.zIndex = 2000; L.el.style.opacity = 0; L.el.style.transition = 'opacity .25s';
+    requestAnimationFrame(() => { L.el.style.opacity = 1; });
+    return { progress: p => L.progress(p), close: () => { L.el.style.transition = 'opacity .4s'; L.el.style.opacity = 0; setTimeout(() => L.el.remove(), 450); } };
   }
   const nextFrame = () => new Promise(r => requestAnimationFrame(r));
   async function play() {
@@ -131,16 +112,18 @@ export function createMainMenu(sys, ctx) {
     const L = loadingScreen(); window.__sysMenu = { open: false };
     await new Promise(r => setTimeout(r, 280)); // let the loading screen fade in over the menu
     el.classList.remove('on', 'fadeout');
+    const W = ctx.warmup; // shader programs: queued all at once, the bar follows how many have linked (first Play only; later it is empty)
+    if (W) { W.rescan(); W.flush(); await W.settle(k => L.progress(0.04 + k * 0.76)); }
     ctx.camera.position.copy(camSave.p); ctx.camera.quaternion.copy(camSave.q); ctx.camera.fov = camSave.fov; ctx.camera.updateProjectionMatrix();
     if (cityNode) cityNode.visible = true; for (const o of hidden) o.visible = true; hidden = []; ctx.menuActive = false;
     flow.setMode('play'); ctx.pipeline.resetHistory?.(); // the game now renders behind the loading screen
-    const t0 = performance.now(), NEED = 8, MIN = 2200, MAX = 25000; let frames = 0;
+    const t0 = performance.now(), NEED = 8, MIN = 1500, MAX = 25000; let frames = 0;
     while (true) { // wait for a handful of real frames + a minimum time, whichever is slower (hard cap so it can never hang)
       await nextFrame(); frames++; const t = performance.now() - t0;
-      L.progress(Math.min(0.97, Math.min(frames / NEED, t / MIN) * 0.97));
+      L.progress(0.8 + Math.min(1, Math.min(frames / NEED, t / MIN)) * 0.18);
       if ((frames >= NEED && t >= MIN) || t > MAX) break;
     }
-    L.progress(1); await new Promise(r => setTimeout(r, 180));
+    L.progress(1); await new Promise(r => setTimeout(r, 220));
     ui.setVisible(true); L.close();
     if (!matchMedia('(pointer: coarse)').matches) ctx.renderer.domElement.requestPointerLock?.();
   }

@@ -10,108 +10,114 @@ if(!u2.searchParams.has('lite')&&!u2.searchParams.has('full')){var R={low:500,me
 var P={off:.001,low:.35,medium:.8,high:1}[g.population];if(P)globalThis.__POP_SCALE=P;var T={off:0,low:.4,medium:1,high:1.4}[g.traffic];if(T!=null)globalThis.__TRAFFIC_SCALE=T;globalThis.__PARK_KEEP=T==null?1:Math.min(1,T)*.75}else if(matchMedia('(pointer:coarse)').matches){globalThis.__POP_SCALE=.35;globalThis.__TRAFFIC_SCALE=.4;globalThis.__PARK_KEEP=.3;globalThis.__LOD_NEAR=100;globalThis.__LOD_FAR=260}}catch(e){}</script>
 <title>Spiderbench</title>
 <link rel="icon" href="data:," />
-<link rel="preload" as="image" href="/assets/loading/01.webp" fetchpriority="high" />
+<link rel="preload" as="image" href="/assets/ui/menu/logo.png" fetchpriority="high" />
 <link rel="stylesheet" id="sys-fonts" href="/assets/ui/fonts/fonts.css" /><!-- the one fonts.css link (src/ui/fonts.js loadFonts() keeps it single) -->
 <style>
 html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:block}
-/* ---- loading screen (shown before any script runs; driven by window.__boot, see below) ----
-   Everything that moves is transform / opacity, so it keeps animating on the compositor while the city build blocks
-   the main thread: the slideshow is pure CSS keyframes, the bar a long CSS transition toward the expected end of the
-   current stage (durations remembered from the previous load on this machine). */
-#boot{--red:#e3262f;position:fixed;inset:0;z-index:1000;background:#040509;color:#f4f6fb;overflow:hidden;
-  font-family:'Spiderbench Sans',Manrope,system-ui,sans-serif;transition:opacity .9s ease;cursor:progress;user-select:none}
-#boot.out{opacity:0;pointer-events:none}
-#boot .slides{position:absolute;inset:0}
-#boot figure{position:absolute;inset:0;margin:0;opacity:0;animation:bootFade var(--T) linear infinite;animation-delay:calc(var(--i) * var(--S))}
-#boot figure img{position:absolute;inset:-2%;width:104%;height:104%;object-fit:cover;animation:bootKB var(--T) linear infinite;
-  animation-delay:calc(var(--i) * var(--S));transform-origin:var(--o,50% 50%);will-change:transform}
-#boot figure:nth-child(even) img{animation-name:bootKB2}
-#boot figcaption{position:absolute;right:clamp(20px,4vw,64px);top:clamp(20px,4.5vh,54px);font:800 12px/1 'Spiderbench Sans',sans-serif;
-  letter-spacing:.42em;text-transform:uppercase;color:rgba(244,246,251,.9);display:flex;align-items:center;gap:12px;
-  text-shadow:0 1px 2px rgba(0,0,0,.55),0 0 18px rgba(0,0,0,.45)}
-#boot figcaption::before{content:'';width:26px;height:1px;background:rgba(244,246,251,.7);box-shadow:0 0 6px rgba(0,0,0,.5)}
-/* each slide: fade in 1.2 s, hold, fade out while the next one fades in (N slides x S s, loop) */
-@keyframes bootFade{0%{opacity:0}3.2%{opacity:1}16.7%{opacity:1}19.9%{opacity:0}100%{opacity:0}}
-@keyframes bootKB{0%{transform:scale(1.10) translate3d(1.2%,.6%,0)}20%{transform:scale(1.0) translate3d(-.6%,-.3%,0)}100%{transform:scale(1.0) translate3d(-.6%,-.3%,0)}}
-@keyframes bootKB2{0%{transform:scale(1.0) translate3d(-1%,.4%,0)}20%{transform:scale(1.09) translate3d(.8%,-.5%,0)}100%{transform:scale(1.09) translate3d(.8%,-.5%,0)}}
-/* legibility shading lives in each slide, under its caption (a global layer above the slides dimmed the captions) */
-#boot figure::after{content:'';position:absolute;inset:0;background:
-  linear-gradient(0deg,rgba(3,4,9,.92) 0%,rgba(3,4,9,.55) 18%,rgba(3,4,9,0) 42%),
-  linear-gradient(180deg,rgba(3,4,9,.5) 0%,rgba(3,4,9,0) 20%),
-  radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 55%,rgba(0,0,0,.55) 100%)}
-#boot figcaption{z-index:1}
-#boot .grain{position:absolute;inset:-50%;opacity:.07;mix-blend-mode:overlay;animation:bootGrain .9s steps(6) infinite;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-@keyframes bootGrain{0%{transform:translate3d(0,0,0)}20%{transform:translate3d(-6%,4%,0)}40%{transform:translate3d(5%,-7%,0)}60%{transform:translate3d(-3%,8%,0)}80%{transform:translate3d(7%,2%,0)}100%{transform:translate3d(0,0,0)}}
-#boot .ui{position:absolute;left:clamp(20px,4vw,64px);right:clamp(20px,4vw,64px);bottom:clamp(26px,6vh,64px)}
-#boot .brand{display:flex;align-items:flex-end;gap:16px;margin-bottom:clamp(18px,3.2vh,30px)}
-#boot .brand b{font:800 clamp(44px,7vw,92px)/.82 'Spiderbench Condensed','Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;
-  text-shadow:0 6px 30px rgba(0,0,0,.45)}
-#boot .brand b i{font-style:normal;color:var(--red)}
-#boot .brand span{font:700 11px/1.5 'Spiderbench Sans',sans-serif;letter-spacing:.42em;text-transform:uppercase;color:rgba(244,246,251,.6);
-  padding-bottom:.35em;border-left:1px solid rgba(244,246,251,.3);padding-left:14px}
-#boot .row{display:flex;justify-content:space-between;align-items:baseline;font:600 12px/1 'Spiderbench Sans',sans-serif;
-  letter-spacing:.3em;text-transform:uppercase;color:rgba(244,246,251,.82);margin-bottom:12px}
-#boot .row .lbl{transition:opacity .25s}
-#boot .msg{display:none;margin-top:12px;font:500 13px/1.45 'Spiderbench Sans',sans-serif;color:rgba(244,246,251,.78);max-width:min(720px,100%);overflow-wrap:anywhere}
-#boot.err .msg{display:block}
-#boot.err .row{color:#ff8a8f}#boot.err .row .dots,#boot.err .bar b{display:none}#boot.err .bar i{background:#9e1017}
-#boot .row .dots i{display:inline-block;width:4px;height:4px;margin-left:6px;border-radius:50%;background:currentColor;opacity:.25;
-  animation:bootDot 1.2s ease-in-out infinite}
-#boot .row .dots i:nth-child(2){animation-delay:.2s}#boot .row .dots i:nth-child(3){animation-delay:.4s}
-@keyframes bootDot{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
-#boot .bar{position:relative;height:2px;background:rgba(244,246,251,.14);overflow:hidden}
-#boot .bar i{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(0);will-change:transform;
-  background:linear-gradient(90deg,#9e1017,var(--red) 70%,#ff6a70)}
-#boot .bar b{position:absolute;top:0;bottom:0;width:18%;left:-18%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0));
-  animation:bootSheen 1.8s ease-in-out infinite;will-change:transform}
-@keyframes bootSheen{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(660%,0,0)}}
-@media (prefers-reduced-motion:reduce){#boot figure img,#boot .grain,#boot .bar b,#boot .row .dots i{animation:none}}
+/* ---- Overpeak-style startup + Play loader (shared by #boot and #ld, built by window.__ob below) ----
+   black screen, current asset name bottom-left, the logo filling in bottom-right, a thick red bar along the bottom edge.
+   Everything that moves is a CSS animation / transform, so it keeps going while the city build blocks the main thread. */
+.ob{--red:#f00;position:fixed;inset:0;z-index:1000;background:#000;color:#fff;overflow:hidden;user-select:none;cursor:progress;
+  font-family:'Spiderbench Sans',Manrope,system-ui,sans-serif;transition:opacity .6s ease}
+.ob.out{opacity:0;pointer-events:none}
+.ob .bar{position:absolute;left:0;right:0;bottom:0;height:clamp(10px,4vh,40px);background:#333}
+.ob .bar i{position:absolute;inset:0;background:var(--red);transform-origin:0 50%;transform:scaleX(0);will-change:transform}
+.ob .asset{position:absolute;left:clamp(16px,1.5vw,32px);bottom:calc(clamp(10px,4vh,40px) + clamp(10px,2.4vh,26px));height:1.5em;overflow:hidden;
+  font:700 clamp(14px,3vh,28px)/1.5 'Spiderbench Sans',system-ui,sans-serif;color:#555;letter-spacing:.01em;white-space:nowrap}
+.ob .asset ul{margin:0;padding:0;list-style:none;animation:obTick calc(var(--n) * .42s) steps(var(--n)) infinite;animation-delay:var(--d,0s)}
+.ob .asset li{height:1.5em}
+@keyframes obTick{to{transform:translate3d(0,calc(-1.5em * var(--n)),0)}}
+.ob .logo{position:absolute;right:clamp(16px,2.4vw,48px);bottom:calc(clamp(10px,4vh,40px) + clamp(10px,2.4vh,26px));width:clamp(120px,15vw,240px);aspect-ratio:1982/365}
+.ob .logo img,.ob .logo b{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;object-position:right bottom}
+.ob .logo b{font:800 clamp(18px,3.4vh,32px)/1 'Spiderbench Condensed','Arial Narrow',sans-serif;text-align:right;letter-spacing:.02em}
+.ob .logo .base{opacity:.16}
+.ob .logo .fill{position:absolute;inset:0;clip-path:inset(0 100% 0 0);transition:clip-path .35s ease-out}
+.ob .msg{display:none;position:absolute;left:clamp(16px,1.5vw,32px);right:clamp(16px,2.4vw,48px);top:clamp(20px,5vh,56px);font:500 14px/1.45 'Spiderbench Sans',sans-serif;color:#ff8a8f;overflow-wrap:anywhere}
+.ob.err .msg{display:block}.ob.err .bar i{background:#9e1017}
+/* intro cards (startup only): pure CSS timeline, plays over the loader and fades away at 3.8 s */
+.ob .intro{position:absolute;inset:0;background:#000;animation:obIntro 4s linear forwards;pointer-events:none}
+@keyframes obIntro{0%,88%{opacity:1;visibility:visible}99%{opacity:0;visibility:visible}100%{opacity:0;visibility:hidden}}
+.ob .card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;opacity:0;animation:obCard 1.9s ease-in-out forwards;animation-delay:var(--at)}
+@keyframes obCard{0%{opacity:0;transform:scale(.97)}22%{opacity:1;transform:scale(1)}78%{opacity:1;transform:scale(1.015)}100%{opacity:0;transform:scale(1.02)}}
+.ob .card img{width:min(46vw,520px);height:auto}
+.ob .card p{margin:0;max-width:min(80vw,680px);text-align:center;font:600 clamp(11px,2vh,17px)/1.6 'Spiderbench Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.ob .card b{font:800 clamp(34px,9vh,90px)/1 'Spiderbench Condensed','Arial Narrow',sans-serif}
+/* touch to start: blue sky + drifting clouds (drop assets/ui/splash/sky.webp in to replace the built-in sky) */
+.ob .touch{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .7s ease;overflow:hidden;cursor:pointer;
+  background:url(/assets/ui/splash/sky.webp) center/cover no-repeat,linear-gradient(180deg,#234f8c 0%,#2f6aa8 45%,#4a86b8 100%)}
+.ob.ready .touch{opacity:1;pointer-events:auto}
+.ob .touch .cl{position:absolute;border-radius:50%;background:radial-gradient(ellipse at 50% 50%,rgba(255,255,255,.85),rgba(255,255,255,0) 68%);filter:blur(10px);animation:obDrift 46s linear infinite;will-change:transform}
+.ob .touch .cl:nth-child(1){width:70vw;height:34vh;left:-10vw;bottom:-12vh;animation-duration:58s}
+.ob .touch .cl:nth-child(2){width:60vw;height:30vh;right:-14vw;bottom:-8vh;opacity:.8;animation-duration:72s;animation-direction:reverse}
+.ob .touch .cl:nth-child(3){width:40vw;height:16vh;left:30vw;top:12vh;opacity:.35;animation-duration:90s}
+@keyframes obDrift{0%{transform:translate3d(-6vw,0,0)}50%{transform:translate3d(6vw,1.5vh,0)}100%{transform:translate3d(-6vw,0,0)}}
+.ob .touch .mid{position:absolute;left:0;right:0;top:50%;transform:translateY(-62%);display:flex;flex-direction:column;align-items:center;gap:3vh}
+.ob .touch .mid img{width:min(52vw,600px);height:auto;filter:drop-shadow(0 4px 22px rgba(0,20,60,.35))}
+.ob .touch .mid b{font:800 clamp(34px,9vh,90px)/1 'Spiderbench Condensed','Arial Narrow',sans-serif;color:#fff;text-shadow:0 4px 22px rgba(0,20,60,.35)}
+.ob .touch .go{font:600 clamp(15px,3.2vh,28px)/1 'Spiderbench Sans',sans-serif;color:#1d3a5f;opacity:.85;animation:obPulse 1.8s ease-in-out infinite}
+@keyframes obPulse{0%,100%{opacity:.35}50%{opacity:.95}}
+.ob.ready{cursor:pointer}
+@media (prefers-reduced-motion:reduce){.ob .asset ul{animation-duration:calc(var(--n) * 1.2s)}.ob .touch .cl{animation:none}}
 </style>
 </head>
 <body>
-<div id="boot" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-  <div class="slides" style="--T:36s;--S:6s">
-    <!-- in-game stills, no UI, graded by tools/loading_grade.py (captured with tools/loading_shots.mjs) -->
-    <figure style="--i:0;--o:45% 40%"><img src="/assets/loading/01.webp" alt="" decoding="async" /><figcaption>Midtown · Golden hour</figcaption></figure>
-    <figure style="--i:1;--o:48% 45%"><img src="/assets/loading/02.webp" alt="" decoding="async" /><figcaption>Times Square · Night</figcaption></figure>
-    <figure style="--i:2;--o:70% 60%"><img src="/assets/loading/03.webp" alt="" decoding="async" /><figcaption>Brooklyn Bridge · Sunrise</figcaption></figure>
-    <figure style="--i:3;--o:55% 60%"><img src="/assets/loading/04.webp" alt="" decoding="async" /><figcaption>Central Park · Morning</figcaption></figure>
-    <figure style="--i:4;--o:52% 55%"><img src="/assets/loading/05.webp" alt="" decoding="async" /><figcaption>Midtown · Noon</figcaption></figure>
-    <figure style="--i:5;--o:60% 65%"><img src="/assets/loading/06.webp" alt="" decoding="async" /><figcaption>East River · Dusk</figcaption></figure>
-  </div>
-  <div class="grain"></div>
-  <div class="ui">
-    <div class="brand"><b>SPIDERBENCH<i>.</i></b></div>
-    <div class="row"><span class="lbl">Starting</span><span class="dots"><i></i><i></i><i></i></span></div>
-    <div class="bar"><i></i><b></b></div>
-    <div class="msg" role="alert"></div>
-  </div>
-</div>
 <script>
-// Boot progress (window.__boot), used by src/main.js and src/world/city.js:
-//   __boot.stage(name) -> Promise (resolves after the label painted)   __boot.sub(0..1) progress inside the stage
-//   __boot.done()      fade out and remove
-// Stage durations are remembered per machine (localStorage 'spiderbench.boot'): the bar eases toward the expected end of the
-// current stage on the compositor, so it keeps moving while a stage blocks the main thread. ?shot / ?playtest: no screen.
+// Overpeak-style loader (window.__ob) + startup progress (window.__boot).
+//   __ob.create({id, intro})  -> {el, progress(0..1), close()}   the black / red-bar loader. Startup uses it with intro cards;
+//                                the Play button builds another one (src/ui/menus/mainmenu.js).
+//   __boot.stage(name) -> Promise (resolves after the bar painted)   __boot.sub(0..1) progress inside the stage
+//   __boot.done()      shows "Touch to Start"; a tap / key fades the screen out and removes it
+// Stage durations are remembered per machine (localStorage 'spiderbench.boot2'): the bar eases toward the expected end of the
+// current stage on the compositor, so it keeps moving while a stage blocks the main thread. ?shot / ?playtest / ?noboot: no screen.
 (() => {
-  const el = document.getElementById('boot');
+  const LOGO = '/assets/ui/menu/logo.png';
+  const NAMES = ['spiderman.glb','walls_col.jpg','walls_nrm.webp','walls_hao.jpg','asphalt_col.png','asphalt_nrm.png','asphalt_macro.png','asphalt_decals.webp',
+    'sidewalk_col.png','sidewalk_nrm.png','roof_col.png','roof_nrm.png','grass_col.png','grass_nrm.png','water_nrm.png','curb_col.webp','bark_col.webp','bark_nrm.webp',
+    'leaves.png','detail_nrm.png','noise.png','markings.png','signs.png','interiors.png','vehicles.glb','vehicles_atlas.png','vehicles_atlas2.webp','props.glb',
+    'peds_atlas.webp','people_bake.webp','people.bin','neon_words.webp','city_signart.webp','coast_atlas.webp','roofplants.webp','thug.glb',
+    'ts_ads.webp','ts_decals.webp','ts_shops.webp','ts_ticker.webp','ts_road.webp','ts_pavers.webp','ts_signs.webp','ts_foliage.webp','ts_spill.png',
+    'music_orch_swing.ogg','sfx_trav.ogg','sfx_ui.ogg','spiderbench-condensed-800.ttf'];
+  const imgFallback = 'onerror="this.replaceWith(Object.assign(document.createElement(\'b\'),{textContent:\'SPIDERBENCH\'}))"';
+  const logoImg = cls => `<img class="${cls}" src="${LOGO}" alt="" draggable="false" ${imgFallback}>`;
+  function create({ id = '', intro = false } = {}) {
+    const el = document.createElement('div'); el.className = 'ob'; if (id) el.id = id;
+    const n = NAMES.length, d = -(Math.random() * n * 0.42).toFixed(2) + 's';
+    el.innerHTML = `<div class="asset" style="--n:${n};--d:${d}"><ul>${NAMES.map(x => `<li>${x}</li>`).join('')}</ul></div>
+      <div class="logo">${logoImg('base')}<div class="fill">${logoImg('')}</div></div>
+      <div class="bar"><i></i></div><div class="msg" role="alert"></div>`
+      + (intro ? `<div class="intro"><div class="card" style="--at:.15s">${logoImg('')}</div>
+        <div class="card" style="--at:1.95s"><p>A non-commercial fan project and technical demo<br>Not affiliated with Marvel, Disney, Sony or Insomniac Games</p></div></div>
+        <div class="touch"><i class="cl"></i><i class="cl"></i><i class="cl"></i><div class="mid">${logoImg('')}<div class="go">Touch to Start</div></div></div>` : '');
+    document.body.prepend(el);
+    const bar = el.querySelector('.bar i'), fill = el.querySelector('.logo .fill');
+    const api = {
+      el,
+      // ms/ease: how the bar travels to p (the startup uses long eases toward the end of a stage)
+      progress(p, ms = 250, ease = 'ease-out') {
+        p = Math.max(0, Math.min(1, p));
+        bar.style.transition = `transform ${ms | 0}ms ${ease}`; bar.style.transform = `scaleX(${p.toFixed(4)})`;
+        fill.style.clipPath = `inset(0 ${((1 - p) * 100).toFixed(1)}% 0 0)`;
+      },
+      close(ms = 650) { el.classList.add('out'); setTimeout(() => el.remove(), ms + 100); },
+    };
+    return api;
+  }
+  window.__ob = { create };
+
   const q = new URLSearchParams(location.search);
   const noop = () => Promise.resolve();
-  if (q.has('shot') || q.has('playtest') || q.has('noboot')) { el.remove(); window.__boot = { stage: noop, sub() {}, done() {} }; return; }
-  const LABELS = { boot: 'Starting', tex: 'Loading textures', gen: 'Laying out the streets', build: 'Raising the skyline',
-    ground: 'Paving the streets', props: 'Parking the traffic', life: 'Bringing the city to life', coll: 'Mapping every surface',
-    player: 'Suiting up', shaders: 'Compiling shaders', frame: 'Swinging in' };
-  const ORDER = Object.keys(LABELS);
-  // defaults (ms) measured on the dev machine; replaced by this machine's last load
-  const DEF = { boot: 1400, tex: 800, gen: 4600, build: 7200, ground: 2300, props: 1300, life: 1250, coll: 2400, player: 800, shaders: 8200, frame: 3600 };
-  let T = { ...DEF }; try { Object.assign(T, JSON.parse(localStorage.getItem('spiderbench.boot') || localStorage.getItem('spidey.boot') || '{}')); localStorage.removeItem('spidey.boot'); } catch (e) { /* private mode */ }
+  if (q.has('shot') || q.has('playtest') || q.has('noboot')) { window.__boot = { stage: noop, sub() {}, done() {} }; return; }
+  const L = create({ id: 'boot', intro: true }), el = L.el;
+  el.setAttribute('role', 'progressbar'); el.setAttribute('aria-label', 'Loading'); el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', '100'); el.setAttribute('aria-valuenow', '0');
+  const ORDER = ['boot', 'tex', 'gen', 'build', 'ground', 'props', 'life', 'coll', 'player', 'shaders', 'frame'];
+  // defaults (ms) measured on the dev machine; replaced by this machine's last load. (The shader warm-up now runs when Play is pressed.)
+  const DEF = { boot: 1400, tex: 800, gen: 4600, build: 7200, ground: 2300, props: 1300, life: 1250, coll: 2400, player: 800, shaders: 900, frame: 1500 };
+  let T = { ...DEF }; try { Object.assign(T, JSON.parse(localStorage.getItem('spiderbench.boot2') || '{}')); } catch (e) { /* private mode */ }
   const total = ORDER.reduce((s, k) => s + T[k], 0);
   const startOf = k => ORDER.slice(0, ORDER.indexOf(k)).reduce((s, n) => s + T[n], 0) / total;
-  const bar = el.querySelector('.bar i'), lbl = el.querySelector('.lbl');
   const seen = {}; let cur = null, curAt = 0, frac = 0, act = 0; // act: last sign of progress (stage or sub)
-  const set = (f, ms, ease) => { frac = Math.max(frac, Math.min(1, f)); bar.style.transition = `transform ${ms | 0}ms ${ease}`; bar.style.transform = `scaleX(${frac.toFixed(4)})`; el.setAttribute('aria-valuenow', Math.round(frac * 100)); };
-  // let the label / bar paint before the next blocking step: two frames, but never wait on rAF in a background tab (it does
+  const set = (f, ms, ease) => { frac = Math.max(frac, Math.min(1, f)); L.progress(frac, ms, ease); el.setAttribute('aria-valuenow', Math.round(frac * 100)); };
+  // let the bar paint before the next blocking step: two frames, but never wait on rAF in a background tab (it does
   // not run there and the load would stall until the tab is shown), and never more than 250 ms
   const raf2 = () => new Promise(r => {
     if (document.hidden) { setTimeout(r, 0); return; }
@@ -122,33 +128,42 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:bl
     const now = performance.now();
     if (cur) seen[cur] = now - curAt;
     cur = name; curAt = act = now;
-    if (!(name in LABELS)) return raf2();
-    lbl.textContent = LABELS[name];
+    if (!(name in T)) return raf2();
     const s = startOf(name), e = s + T[name] / total;
     set(s, 260, 'ease-out');                                               // catch up to the stage start
     requestAnimationFrame(() => set(s + (e - s) * 0.94, T[name] * 1.15, 'cubic-bezier(.3,.6,.4,1)')); // then creep toward its end
     return raf2();
   }
-  function sub(k) { // measured progress inside the current stage (shader links)
-    if (!cur || !(cur in LABELS)) return;
+  function sub(k) { // measured progress inside the current stage
+    if (!cur || !(cur in T)) return;
     act = performance.now();
     const s = startOf(cur), e = s + T[cur] / total;
     set(s + (e - s) * Math.max(0, Math.min(1, k)), 180, 'ease-out');
   }
-  let finished = false;
+  let finished = false, started = false;
+  function start() { // the tap: fade the whole screen out
+    if (started || !finished) return; started = true;
+    removeEventListener('keydown', onKey, true);
+    L.close(700);
+  }
+  const onKey = e => { if (el.classList.contains('ready') && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); e.stopPropagation(); start(); } };
   function done() {
     if (finished) return; finished = true;
     if (cur) seen[cur] = performance.now() - curAt;
-    try { const m = {}; for (const k of ORDER) m[k] = Math.round(seen[k] != null ? (T[k] + 2 * seen[k]) / 3 : T[k]); localStorage.setItem('spiderbench.boot', JSON.stringify(m)); } catch (e) { /* ignore */ }
+    try { const m = {}; for (const k of ORDER) m[k] = Math.round(seen[k] != null ? (T[k] + 2 * seen[k]) / 3 : T[k]); localStorage.setItem('spiderbench.boot2', JSON.stringify(m)); } catch (e) { /* ignore */ }
     set(1, 300, 'ease-out');
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 1000); }, 350);
+    // wait for the intro cards (4 s) so Touch to Start never cuts them off
+    const wait = Math.max(450, 4000 - performance.now());
+    setTimeout(() => { el.classList.add('ready'); el.style.cursor = 'pointer'; }, wait);
   }
+  el.addEventListener('pointerdown', e => { if (el.classList.contains('ready')) { e.preventDefault(); start(); } });
+  addEventListener('keydown', onKey, true);
   window.__boot = { stage, sub, done, get timings() { return { ...seen }; } };
   // a failed start never leaves the screen loading forever. The error message is shown on the screen: at once when it is
   // certainly fatal (no WebGL, a script that failed to load, anything before the first loading stage), otherwise after
   // 8 s without any progress (a harmless error in an optional module while loading carries on is ignored)
   const msgEl = el.querySelector('.msg');
-  const showErr = m => { if (finished) return; el.classList.add('err'); lbl.textContent = 'Could not start'; msgEl.textContent = (m || 'Unknown error') + ' — details in the browser console'; };
+  const showErr = m => { if (finished) return; el.classList.add('err'); el.querySelector('.intro')?.remove(); msgEl.textContent = 'Could not start: ' + (m || 'Unknown error') + ' (details in the browser console)'; };
   const fail = (m, fatal) => { if (finished) return; if (fatal || cur === 'boot') { showErr(m); return; } const at = act; setTimeout(() => { if (act === at) showErr(m); }, 8000); };
   const msgOf = e => String(e?.message || e || '').slice(0, 240);
   addEventListener('error', e => {

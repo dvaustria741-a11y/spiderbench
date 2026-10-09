@@ -22,7 +22,7 @@ import { BIG_CASTER_LAYER } from './render/csm.js';
 
 const params = new URLSearchParams(location.search);
 const shotName = params.get('shot');
-// loading screen (index.html): stage labels + progress; it fades out once the first frames and the game systems are up
+// start-up screen (index.html, Overpeak style): progress bar + asset names; shows Touch to Start once the first frames and the game systems are up
 const boot = window.__boot || { stage: async () => {}, sub() {}, done() {} };
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, reversedDepthBuffer: true });
@@ -74,8 +74,9 @@ if (matchMedia('(pointer: coarse)').matches || params.has('touch')) import('./ui
 // (render/warmup.js). ?nowarm = old behaviour (A/B)
 const warmup = !shotName && !params.has('nowarm') ? createWarmup(renderer, scene, camera, { mirrorLayers: [REFL_LAYER, BIG_CASTER_LAYER] }) : null;
 // first the state the first frame would set that is part of the program keys: the sky IBL (scene.environment, from the
-// first lighting update) and the pipeline's NO_SSR material defines
-if (warmup) { lighting.update(camera); pipeline.prepareMaterials?.(); warmup.rescan(); warmup.flush(); await warmup.settle(k => boot.sub(k)); }
+// first lighting update) and the pipeline's NO_SSR material defines. The queue itself is flushed when Play is pressed
+// (ui/menus/mainmenu.js: ctx.warmup.flush() + settle() behind the Play loading screen), not at start-up
+if (warmup) { lighting.update(camera); pipeline.prepareMaterials?.(); warmup.rescan(); ctx.warmup = warmup; }
 await boot.stage('frame');
 let framesDrawn = 0;
 const systemsReady = shotName ? Promise.resolve() : import('./game/systems/index.js').then(m => m.initSystems(ctx)).catch(e => console.error('[systems] init failed', e)) // open-world systems (C5)
@@ -124,7 +125,7 @@ if (shotName) {
     const k = 0.1, sm = (key, v) => { P[key] += (v - P[key]) * k; };
 
     sm('upd', t1 - a); sm('rnd', t2 - t1); sm('frame', (ctx.rawDt ?? realDt) * 1000); sm('pl', b - a); sm('wo', c - b); sm('li', d2 - c); sm('hu', e - d2); sm('sy', t1 - e);
-    warmup?.step(); // (perf r3)
+    if (!ctx.menuActive) warmup?.step(); // (perf r3) trickle later additions; the title screen waits, Play flushes the whole queue
     if (++framesDrawn === 1) boot.sub(0.4); // the first frame (remaining uploads / links) is in
   }
   // tools (tools/film.mjs): ctx.manualStep = true pauses the real-time loop; ctx.stepFrame(dt) then advances exactly one
