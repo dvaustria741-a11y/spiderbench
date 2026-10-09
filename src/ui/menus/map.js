@@ -489,7 +489,7 @@ export function createMapPage(sys) {
       if (held.has('KeyA') || held.has('ArrowLeft')) view.x -= sp; if (held.has('KeyD') || held.has('ArrowRight')) view.x += sp;
       if (held.size) clampView();
       travel.update(0);
-      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > 0.1) { drawAcc = 0; dirty = false; const t0 = performance.now(); draw(); window.__mapMs = performance.now() - t0; } // 10 Hz idle redraw (the canvas was fully repainted every frame)
+      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > 0.25) { drawAcc = 0; dirty = false; const t0 = performance.now(); draw(); window.__mapMs = performance.now() - t0; } // 10 Hz idle redraw (the canvas was fully repainted every frame)
       if (pulse > 0.25) { pulse = 0; updateLegend(); }
     },
   };

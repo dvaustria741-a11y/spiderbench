@@ -474,3 +474,5 @@ body.ui-minimal .zip-reticle { display: none !important; }
 /* Suits opened from the title screen: no other tabs, no 'Main menu' hint */
 .sys-menu.from-main .tabs .tab:not(.on), .sys-menu.from-main .tabs .qe { visibility: hidden; pointer-events: none; }
 .sys-menu.from-main .hints [data-k="menu"] { display: none; }
+
+@media (pointer: coarse) { .sys-menu .scan { display: none; } }
