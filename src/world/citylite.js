@@ -7,6 +7,7 @@ import { createOpenTraffic } from './opentraffic.js';
 import { loadOpenSkin, skinGround, skinRoof, skinTree } from './openskin.js';
 import { loadVehicleModels } from './vehicles.js';
 import { G, avenues, streets, blocks, generateLots, streetsAt, hash2, mulberry32, KINDS, inPark, GRID, RASTER, CLS, cellAt, PARKS, EXITS, SPAWN } from './openmap.js';
+import { MESH, LINES, MARKS } from './openlayout.js';
 import { Solids, CollisionGrid, makeQueries, collisionDebugLines } from './collision.js';
 import { ZipPoints, createGeoDebug } from './zippoints.js';
 import { attachLife } from './npc/life.js';
@@ -188,91 +189,69 @@ export async function buildCity({ scene, renderer }) {
   };
   const paint = (x0, z0, x1, z1, layer, f) => splitChunks(x0, z0, x1, z1, (a, b, c, d) => texq(chunkOf((a + c) / 2, (b + d) / 2).pnt, a, b, c, d, PAINT_Y, layer, f));
 
-  // OUT cells that are not connected to the raster border are small gaps inside the city: make them lots so no pond appears in a block
-  { const out = new Uint8Array(NX * NZ), st = [];
-    const push = (i, j) => { const k = j * NX + i; if (!out[k] && GRID[k] === CLS.OUT) { out[k] = 1; st.push(k); } };
-    for (let i = 0; i < NX; i++) { push(i, 0); push(i, NZ - 1); } for (let j = 0; j < NZ; j++) { push(0, j); push(NX - 1, j); }
-    while (st.length) { const k = st.pop(), i = k % NX, j = (k / NX) | 0; if (i > 0) push(i - 1, j); if (i < NX - 1) push(i + 1, j); if (j > 0) push(i, j - 1); if (j < NZ - 1) push(i, j + 1); }
-    for (let k = 0; k < NX * NZ; k++) if (GRID[k] === CLS.OUT && !out[k]) GRID[k] = CLS.LOT; }
-  // roads (asphalt), sidewalks, lots, plaza, parks; everything outside the city is water
-  flat(isRoad, LY.ASPH, 0);
-  flat((c) => c === CLS.WALK, LY.WALK, CH);
-  flat((c) => c === CLS.LOT, LY.CONC, CH);
-  flat((c) => c === CLS.PLAZA, LY.PAVE, CH);
-  flat((c) => c === CLS.PARK, LY.GRASS, CH + 0.02);
-  // (water is a real plane + sea walls below, see the water section)
-
-  // kerb faces: every raised cell that touches a road cell
-  { const D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (const [dx, dz] of D) {
-      const m = new Uint8Array(NX * NZ);
-      for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) if (isRaised(GRID[j * NX + i]) && isRoad(gc(i + dx, j + dz))) m[j * NX + i] = 1;
-      // merge along the edge direction
-      const alongZ = dx !== 0;
-      const outer = alongZ ? NX : NZ, inner = alongZ ? NZ : NX;
-      for (let o = 0; o < outer; o++) for (let n = 0; n < inner;) {
-        const i = alongZ ? o : n, j = alongZ ? n : o;
-        if (!m[j * NX + i]) { n++; continue; }
-        let k = n; while (k < inner && m[(alongZ ? k : o) * NX + (alongZ ? o : k)]) k++;
-        if (alongZ) {
-          const X = X0 + (dx > 0 ? i + 1 : i) * CELL, za = Z0 + n * CELL, zb = Z0 + k * CELL;
-          splitChunks(X, za, X + 1e-3, zb, (a, b, c, d) => {
-            const gb = chunkOf(X, (b + d) / 2).gnd; const U = [[99, 0], [99, 0], [99, 0], [99, 0]];
-            if (dx > 0) gb.quad([X, 0, d], [X, 0, b], [X, CH, b], [X, CH, d], [1, 0, 0], U, C.curb); else gb.quad([X, 0, b], [X, 0, d], [X, CH, d], [X, CH, b], [-1, 0, 0], U, C.curb);
-          });
-        } else {
-          const Z = Z0 + (dz > 0 ? j + 1 : j) * CELL, xa = X0 + n * CELL, xb = X0 + k * CELL;
-          splitChunks(xa, Z, xb, Z + 1e-3, (a, b, c, d) => {
-            const gb = chunkOf((a + c) / 2, Z).gnd; const U = [[99, 0], [99, 0], [99, 0], [99, 0]];
-            if (dz > 0) gb.quad([a, 0, Z], [c, 0, Z], [c, CH, Z], [a, CH, Z], [0, 0, 1], U, C.curb); else gb.quad([c, 0, Z], [a, 0, Z], [a, CH, Z], [c, CH, Z], [0, 0, -1], U, C.curb);
-          });
+  // ---- smooth ground (openlayout.js: triangulated polygons from the layout image, same tile mapping as every other ground quad)
+  const b64u8 = (b) => { const bin = atob(b), u = new Uint8Array(bin.length); for (let i = 0; i < u.length; i++) u[i] = bin.charCodeAt(i); return u; };
+  const i16 = (b) => new Int16Array(b64u8(b).buffer), u16 = (b) => new Uint16Array(b64u8(b).buffer);
+  const meshLayer = (key, layer, y) => {
+    const [vb, ib] = MESH[key]; if (!vb) return;
+    const V = i16(vb), I = u16(ib), gb = new GB(), f = W(SC[layer]);
+    for (let t = 0; t < I.length; t += 3) {
+      let a = I[t], b = I[t + 1], c = I[t + 2];
+      const ux = (V[2 * b] - V[2 * a]), uz = (V[2 * b + 1] - V[2 * a + 1]), vx = (V[2 * c] - V[2 * a]), vz = (V[2 * c + 1] - V[2 * a + 1]);
+      if (uz * vx - ux * vz < 0) { const k = b; b = c; c = k; } // face up
+      for (const i of [a, b, c]) {
+        const x = V[2 * i] / 16, z = V[2 * i + 1] / 16; gb.p.push(x, y, z); gb.n.push(0, 1, 0);
+        if (TEX) { const q = f(x, z); gb.u.push(layer, 0); gb.c.push(q[0], q[1], 0); } else { gb.u.push(99, 0); gb.c.push(FB[layer][0], FB[layer][1], FB[layer][2]); }
+      }
+    }
+    const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = 'ground-' + key; root.add(m);
+  };
+  meshLayer('asph', LY.ASPH, 0);
+  meshLayer('walk', LY.WALK, CH);
+  meshLayer('lot', LY.CONC, CH);
+  meshLayer('plaza', LY.PAVE, CH);
+  meshLayer('park', LY.GRASS, CH + 0.02);
+  // vertical walls along smooth polylines (outside on the right of travel): kerbs between road and block, sea wall between land and water
+  const wallLines = (key, y0, y1, layer, sc) => {
+    const [pb, lens] = LINES[key]; if (!lens.length) return;
+    const P = i16(pb), gb = new GB(); let o = 0;
+    for (const n of lens) {
+      let acc = 0;
+      for (let k = 0; k < n - 1; k++) {
+        const ax = P[2 * (o + k)] / 16, az = P[2 * (o + k) + 1] / 16, bx = P[2 * (o + k + 1)] / 16, bz = P[2 * (o + k + 1) + 1] / 16;
+        const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.05) continue;
+        const nx = dz / L, nz = -dx / L, s0 = acc, s1 = acc + L; acc = s1;
+        const V = [[bx, y0, bz, s1, y0], [ax, y0, az, s0, y0], [ax, y1, az, s0, y1], [bx, y1, bz, s1, y1]];
+        for (const i of [0, 1, 2, 0, 2, 3]) {
+          const v = V[i]; gb.p.push(v[0], v[1], v[2]); gb.n.push(nx, 0, nz);
+          if (TEX) { gb.u.push(layer, 0); gb.c.push(v[3] / sc, v[4] / sc, 0); } else { gb.u.push(99, 0); gb.c.push(C.curb[0], C.curb[1], C.curb[2]); }
         }
-        n = k;
+      }
+      o += n;
+    }
+    const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = 'walls-' + key; root.add(m);
+  };
+  wallLines('kerb', 0, CH, LY.KERB, 6);
+
+  // lane markings: straight bands cut at every junction (centre line stays put along a whole road); double yellow in the middle,
+  // dashed white lane lines on the wider roads
+  { const LANE = 3.6, IN = 1.5;
+    for (const [t, c, a, b, hw] of MARKS) {
+      if (b - a < 2 * IN + 4 || hw < 5.5) continue;
+      const strips = [['D', c - 1.8, c + 1.8]];
+      for (let k = 1; k * LANE < hw - 2.5; k++) for (const sg of [-1, 1]) strips.push(['L', c + sg * k * LANE - 1.8, c + sg * k * LANE + 1.8]);
+      for (const [k, s0, s1] of strips) {
+        if (t === 'V') paint(s0, a + IN, s1, b - IN, k === 'D' ? LY.DBL : LY.DASH, k === 'D' ? (x, z) => [(x - s0) / 3.6, z / 3.6] : (x, z) => [(x - s0) / 3.6, z / 36]);
+        else paint(a + IN, s0, b - IN, s1, k === 'D' ? LY.DBL : LY.DASH, k === 'D' ? (x, z) => [(z - s0) / 3.6, x / 3.6] : (x, z) => [(z - s0) / 3.6, x / 36]);
       }
     } }
-
-  // road markings (paint layer): double yellow down the middle of every road run wide enough, dashed lane lines on the wide ones.
-  // Avenues are scanned row by row, streets column by column; identical strips on consecutive lines merge into one quad.
-  { const LANE = 3.6, merge = (lines, emit) => {
-      let prev = new Map();
-      lines.forEach((strips, n) => {
-        const cur = new Map();
-        for (const st of strips) { const key = st.k + '|' + st.a + '|' + st.b, r = prev.get(key); if (r) { r.n1 = n + 1; cur.set(key, r); } else { const nr = { ...st, n0: n, n1: n + 1 }; cur.set(key, nr); emit.push(nr); } }
-        prev = cur;
-      });
-    };
-    const strips = (lo, hi) => { // lo / hi: road edges (m) across the road; returns the paint strips (across-range) for one run
-      const w = hi - lo; if (w < 14) return []; const c = (lo + hi) / 2, out = [{ k: 'D', a: +(c - 1.8).toFixed(2), b: +(c + 1.8).toFixed(2) }];
-      for (let k = 1; k * LANE < w / 2 - 2.5; k++) for (const sg of [-1, 1]) out.push({ k: 'L', a: +(c + sg * k * LANE - 1.8).toFixed(2), b: +(c + sg * k * LANE + 1.8).toFixed(2) });
-      return out;
-    };
-    const av = [], st = [], avE = [], stE = [];
-    for (let j = 0; j < NZ; j++) { const row = []; for (let i = 0; i < NX;) { if (GRID[j * NX + i] !== CLS.AV) { i++; continue; } let k = i; while (k < NX && GRID[j * NX + k] === CLS.AV) k++; row.push(...strips(X0 + i * CELL, X0 + k * CELL)); i = k; } av.push(row); }
-    for (let i = 0; i < NX; i++) { const col = []; for (let j = 0; j < NZ;) { if (GRID[j * NX + i] !== CLS.ST) { j++; continue; } let k = j; while (k < NZ && GRID[k * NX + i] === CLS.ST) k++; col.push(...strips(Z0 + j * CELL, Z0 + k * CELL)); j = k; } st.push(col); }
-    merge(av, avE); merge(st, stE);
-    for (const r of avE) { const za = Z0 + r.n0 * CELL, zb = Z0 + r.n1 * CELL; if (zb - za < 6) continue;
-      paint(r.a, za, r.b, zb, r.k === 'D' ? LY.DBL : LY.DASH, r.k === 'D' ? (x, z) => [(x - r.a) / 3.6, z / 3.6] : (x, z) => [(x - r.a) / 3.6, z / 36]); }
-    for (const r of stE) { const xa = X0 + r.n0 * CELL, xb = X0 + r.n1 * CELL; if (xb - xa < 6) continue;
-      paint(xa, r.a, xb, r.b, r.k === 'D' ? LY.DBL : LY.DASH, r.k === 'D' ? (x, z) => [(z - r.a) / 3.6, x / 3.6] : (x, z) => [(z - r.a) / 3.6, x / 36]); }
-  }
 
   // water: one plane at the swim level under everything (land is higher), vertical sea walls wherever land meets water,
   // and the two exit roads as causeways running on to the horizon
   { const U = [[99, 0], [99, 0], [99, 0], [99, 0]], y0 = SEABED, y1 = CH;
     const wm = new THREE.Mesh(new THREE.PlaneGeometry(18000, 18000).rotateX(-Math.PI / 2), matWater);
     wm.position.y = SWIM_Y; wm.frustumCulled = false; wm.receiveShadow = true; wm.name = 'water'; root.add(wm);
-    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
-      if (GRID[j * NX + i] === CLS.OUT) continue;
-      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const ni = i + dx, nj = j + dz; if (ni < 0 || nj < 0 || ni >= NX || nj >= NZ || GRID[nj * NX + ni] !== CLS.OUT) continue;
-        const gb = chunkOf(X0 + (i + 0.5) * CELL, Z0 + (j + 0.5) * CELL).gnd;
-        if (dx) { const X = X0 + (dx > 0 ? i + 1 : i) * CELL, za = Z0 + j * CELL, zb = za + CELL;
-          if (dx > 0) gb.quad([X, y0, zb], [X, y0, za], [X, y1, za], [X, y1, zb], [1, 0, 0], U, C.curb); else gb.quad([X, y0, za], [X, y0, zb], [X, y1, zb], [X, y1, za], [-1, 0, 0], U, C.curb);
-        } else { const Z = Z0 + (dz > 0 ? j + 1 : j) * CELL, xa = X0 + i * CELL, xb = xa + CELL;
-          if (dz > 0) gb.quad([xa, y0, Z], [xb, y0, Z], [xb, y1, Z], [xa, y1, Z], [0, 0, 1], U, C.curb); else gb.quad([xb, y0, Z], [xa, y0, Z], [xa, y1, Z], [xb, y1, Z], [0, 0, -1], U, C.curb);
-        }
-      }
-    }
+    wallLines('sea', y0, y1, LY.KERB, 3);
     const rx0 = X0, rx1 = X0 + NX * CELL;
     for (const [a, b, e] of [[rx0 - 1500, rx0, EXITS.W], [rx1, rx1 + 1500, EXITS.E]]) for (let x = a; x < b; x += 300) {
       const xa = x, xb = Math.min(b, x + 300), zN = e.z - e.half, zS = e.z + e.half, gb = chunkOf((xa + xb) / 2, e.z).gnd;
