@@ -94,7 +94,7 @@ export function initSystems(ctx) {
     g.bloom = gradeBase.bloom * (s.gfx?.bloom === 'off' ? 0 : 1);
     ctx.fpsCap = FPS[s.frameRate] ?? 0;
     // Graphics: traffic density is live (the rest of the Graphics list applies after a restart)
-    const td = { off: 0, low: 0.4, medium: 1, high: 1.4 }[s.gfx?.traffic];
+    const td = { off: 0, low: 0.12, medium: 0.7, high: 1.2 }[s.gfx?.traffic];
     if (td != null) { ctx.world.life?.traffic?.setDensity?.(td); ctx.world.highways?.setTraffic?.(td > 0); }
     if (s.gfx?.population) ctx.world.life?.crowd?.setEnabled?.(s.gfx.population !== 'off'); // live: Off removes every pedestrian at once
     { const sp = ctx.lighting?.sky?.params, off = s.gfx?.clouds === 'off'; if (sp && !!sp.cloudsOff !== off) { sp.cloudsOff = off; ctx.lighting.refresh?.(); } } // live: Off removes all clouds
