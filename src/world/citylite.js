@@ -7,7 +7,7 @@ import { createOpenTraffic } from './opentraffic.js';
 import { loadOpenSkin, skinGround, skinRoof, skinTree } from './openskin.js';
 import { loadVehicleModels } from './vehicles.js';
 import { G, avenues, streets, blocks, generateLots, streetsAt, hash2, mulberry32, KINDS, inPark, GRID, RASTER, CLS, cellAt, PARKS, EXITS, SPAWN } from './openmap.js';
-import { MESH, LINES, MARKS } from './openlayout.js';
+import { MESH, LINES } from './openlayout.js';
 import { Solids, CollisionGrid, makeQueries, collisionDebugLines } from './collision.js';
 import { ZipPoints, createGeoDebug } from './zippoints.js';
 import { attachLife } from './npc/life.js';
@@ -101,7 +101,7 @@ export async function buildCity({ scene, renderer }) {
   skinGround(matGround, skin); skinGround(matPaint, skin);
 
   // open water: one big plane with low animated waves (normal-only, so it stays cheap). The player can swim in it (world.swimY).
-  const SWIM_Y = -0.8, SEABED = SWIM_Y - 2.4;
+  const SWIM_Y = -1.6, SEABED = SWIM_Y - 2.4;
   const waterU = { uWT: { value: 0 } };
   const matWater = new THREE.MeshStandardMaterial({ color: 0x2f5870, roughness: 0.16, metalness: 0 });
   matWater.onBeforeCompile = (sh) => {
@@ -233,18 +233,7 @@ export async function buildCity({ scene, renderer }) {
   };
   wallLines('kerb', 0, CH, LY.KERB, 6);
 
-  // lane markings: straight bands cut at every junction (centre line stays put along a whole road); double yellow in the middle,
-  // dashed white lane lines on the wider roads
-  { const LANE = 3.6, IN = 1.5;
-    for (const [t, c, a, b, hw] of MARKS) {
-      if (b - a < 2 * IN + 4 || hw < 5.5) continue;
-      const strips = [['D', c - 1.8, c + 1.8]];
-      for (let k = 1; k * LANE < hw - 2.5; k++) for (const sg of [-1, 1]) strips.push(['L', c + sg * k * LANE - 1.8, c + sg * k * LANE + 1.8]);
-      for (const [k, s0, s1] of strips) {
-        if (t === 'V') paint(s0, a + IN, s1, b - IN, k === 'D' ? LY.DBL : LY.DASH, k === 'D' ? (x, z) => [(x - s0) / 3.6, z / 3.6] : (x, z) => [(x - s0) / 3.6, z / 36]);
-        else paint(a + IN, s0, b - IN, s1, k === 'D' ? LY.DBL : LY.DASH, k === 'D' ? (x, z) => [(z - s0) / 3.6, x / 3.6] : (x, z) => [(z - s0) / 3.6, x / 36]);
-      }
-    } }
+  // no lane markings: the reference game uses plain asphalt (MARKS in openlayout.js still has the straight bands if they come back)
 
   // water: one plane at the swim level under everything (land is higher), vertical sea walls wherever land meets water,
   // and the two exit roads as causeways running on to the horizon
