@@ -3,6 +3,8 @@
 // Everything visible is merged into per-chunk meshes (400 m chunks) so culling is cheap; collision uses the same
 // Solids / CollisionGrid / ZipPoints as the Manhattan map, so swinging, wall-running, zipping and combat behave the same.
 import * as THREE from 'three';
+import { createOpenTraffic } from './opentraffic.js';
+import { loadVehicleModels } from './vehicles.js';
 import { G, avenues, streets, blocks, generateLots, streetsAt, hash2, mulberry32, KINDS, NCOL, NROW, inPark } from './openmap.js';
 import { Solids, CollisionGrid, makeQueries, collisionDebugLines } from './collision.js';
 import { ZipPoints, createGeoDebug } from './zippoints.js';
@@ -323,6 +325,11 @@ export async function buildCity({ scene, renderer }) {
     },
   };
   attachLife(world, { traffic: null, crowd: null, pigeons: null });
+  // street traffic: 1-D lane followers on the grid (opentraffic.js), real vehicles.glb models; density = Options > Vehicle Density
+  try {
+    const OT = createOpenTraffic({ models: await loadVehicleModels(renderer), group: root, scale: globalThis.__TRAFFIC_SCALE ?? 0.12 });
+    if (OT) { world.openTraffic = OT; const u0 = world.update; world.update = (dt, camera) => { u0(dt, camera); const D = globalThis.__DRAW_DIST ?? bootDD; OT.update(dt, camera, Math.min(Number.isFinite(D) ? D : 1100, 1100)); }; }
+  } catch (e) { console.warn('[citylite] open traffic unavailable', e); }
   console.log(`[citylite] built in ${(performance.now() - t0).toFixed(0)} ms: ${lots.length} buildings (${nMass} masses), ${chunks.size} chunks, ${treeMeshes.reduce((a, m) => a + m.count, 0)} trees, ${grid.n} solids, ${finZ.count} zip points`);
   return world;
 }
