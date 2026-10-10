@@ -156,13 +156,13 @@ export async function buildCity({ scene, renderer }) {
   };
   const paint = (x0, z0, x1, z1, layer, f) => splitChunks(x0, z0, x1, z1, (a, b, c, d) => texq(chunkOf((a + c) / 2, (b + d) / 2).pnt, a, b, c, d, PAINT_Y, layer, f));
 
-  // roads (asphalt), sidewalks, lots, plaza, parks; the outside is low grass
+  // roads (asphalt), sidewalks, lots, plaza, parks; everything outside the city is water
   flat(isRoad, LY.ASPH, 0);
   flat((c) => c === CLS.WALK, LY.WALK, CH);
   flat((c) => c === CLS.LOT, LY.CONC, CH);
   flat((c) => c === CLS.PLAZA, LY.PAVE, CH);
   flat((c) => c === CLS.PARK, LY.GRASS, CH + 0.02);
-  flat((c) => c === CLS.OUT, LY.GRASS, -0.35);
+  flat((c) => c === CLS.OUT, LY.WATER, -0.1);
 
   // kerb faces: every raised cell that touches a road cell
   { const D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -218,10 +218,10 @@ export async function buildCity({ scene, renderer }) {
       paint(xa, r.a, xb, r.b, r.k === 'D' ? LY.DBL : LY.DASH, r.k === 'D' ? (x, z) => [(z - r.a) / 3.6, x / 3.6] : (x, z) => [(z - r.a) / 3.6, x / 36]); }
   }
 
-  // outskirts beyond the raster (never under it), plus the two exit roads running on to the horizon
-  { const big = new GB(), R = 9000, Y = -0.35, gf = W(SC[LY.GRASS]), rx0 = X0, rx1 = X0 + NX * CELL, rz0 = Z0, rz1 = Z0 + NZ * CELL;
-    texq(big, rx0, -R, rx1, rz0, Y, LY.GRASS, gf); texq(big, rx0, rz1, rx1, R, Y, LY.GRASS, gf); // north / south
-    for (const [a, b, e] of [[-R, rx0, EXITS.W], [rx1, R, EXITS.E]]) { texq(big, a, -R, b, e.z - e.half, Y, LY.GRASS, gf); texq(big, a, e.z + e.half, b, R, Y, LY.GRASS, gf); } // west / east, with a gap for the road
+  // water beyond the raster (never under it), plus the two exit roads running on to the horizon
+  { const big = new GB(), R = 9000, Y = -0.1, gf = W(16), rx0 = X0, rx1 = X0 + NX * CELL, rz0 = Z0, rz1 = Z0 + NZ * CELL;
+    texq(big, rx0, -R, rx1, rz0, Y, LY.WATER, gf); texq(big, rx0, rz1, rx1, R, Y, LY.WATER, gf); // north / south
+    for (const [a, b, e] of [[-R, rx0, EXITS.W], [rx1, R, EXITS.E]]) { texq(big, a, -R, b, e.z - e.half, Y, LY.WATER, gf); texq(big, a, e.z + e.half, b, R, Y, LY.WATER, gf); } // west / east, with a gap for the road
     const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m);
     for (const [a, b, e] of [[rx0 - 1500, rx0, EXITS.W], [rx1, rx1 + 1500, EXITS.E]]) for (let x = a; x < b; x += 300) tq(x, e.z - e.half, Math.min(b, x + 300), e.z + e.half, LY.ASPH, W(SC[0])); }
   function tq(x0, z0, x1, z1, layer, f) { texq(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd, x0, z0, x1, z1, 0, layer, f); }
