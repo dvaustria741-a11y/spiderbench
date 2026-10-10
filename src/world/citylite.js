@@ -8,6 +8,7 @@ import { Solids, CollisionGrid, makeQueries, collisionDebugLines } from './colli
 import { ZipPoints, createGeoDebug } from './zippoints.js';
 import { attachLife } from './npc/life.js';
 import { nightK } from '../render/daynight.js';
+import { readGfx } from '../render/gfxprefs.js';
 
 const CHUNK = 400;
 const BAY = 3.2, FLOOR = 3.6;
@@ -96,7 +97,7 @@ export async function buildCity({ scene, renderer }) {
   const chunks = new Map();
   const chunkOf = (x, z) => {
     const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK), k = cx * 1000 + cz;
-    let c = chunks.get(k); if (!c) chunks.set(k, c = { cx, cz, fac: new GB(), gls: new GB(), gnd: new GB(), pnt: new GB(), trees: [] });
+    let c = chunks.get(k); if (!c) chunks.set(k, c = { cx, cz, fac: new GB(), gls: new GB(), gnd: new GB(), pnt: new GB(), trees: [], meshes: [] });
     return c;
   };
 
@@ -116,21 +117,22 @@ export async function buildCity({ scene, renderer }) {
     const zc = streets[NROW / 2];
     for (const [a, b] of [[xMin - AVH - 1500, xMin - AVH], [xMax + AVH, xMax + AVH + 1500]]) for (let x = a; x < b; x += 300) roadRect(x, zc - STH, Math.min(b, x + 300), zc + STH);
   }
-  // blocks: sidewalk ring raised by the kerb, then the inner property surface
+  // blocks: sidewalk ring (4 rects, no overlap with the inner surface) raised by the kerb, then the inner property surface.
+  // Nothing is stacked on top of anything coplanar-ish: stacked layers a few cm apart z-fight at distance (the 150 km far plane
+  // leaves almost no depth precision), which showed the grass through the roads.
   for (const B of blocks) {
     const gb = chunkOf(B.cx, B.cz).gnd, kind = B.kind;
-    flat(gb, B.x0, B.z0, B.x1, B.z1, CH, C.walk);
+    flat(gb, B.x0, B.z0, B.x1, B.pz0, CH, C.walk); flat(gb, B.x0, B.pz1, B.x1, B.z1, CH, C.walk);
+    flat(gb, B.x0, B.pz0, B.px0, B.pz1, CH, C.walk); flat(gb, B.px1, B.pz0, B.x1, B.pz1, CH, C.walk);
     for (const [ax, az, bx, bz, n] of [[B.x0, B.z1, B.x1, B.z1, [0, 0, -1]], [B.x1, B.z0, B.x0, B.z0, [0, 0, 1]], [B.x0, B.z0, B.x0, B.z1, [1, 0, 0]], [B.x1, B.z1, B.x1, B.z0, [-1, 0, 0]]]) {
-      // kerb face (vertical strip 0 .. CH), normal points to the road
-      const o = [-n[0] * 0 + 0, 0, 0]; void o;
-      gb.quad([ax, 0, az], [bx, 0, bz], [bx, CH, bz], [ax, CH, az], [-n[0], 0, -n[2]], [[0, 0], [0, 0], [0, 0], [0, 0]], C.curb);
+      gb.quad([ax, 0, az], [bx, 0, bz], [bx, CH, bz], [ax, CH, az], [-n[0], 0, -n[2]], [[0, 0], [0, 0], [0, 0], [0, 0]], C.curb); // kerb face
     }
-    const iy = kind === KINDS.KIND_PARK ? CH + 0.02 : CH + 0.006;
+    const iy = kind === KINDS.KIND_PARK ? CH + 0.02 : CH;
     const ic = kind === KINDS.KIND_PARK ? C.grass : kind === KINDS.KIND_PLAZA ? C.plaza : kind === KINDS.KIND_LOT ? C.lot : (B.h < 0.45 ? C.yard : C.dirt);
     flat(gb, B.px0, B.pz0, B.px1, B.pz1, iy, ic);
   }
   // road paint: avenue centre (double yellow) + dashed lane lines, street centre dashes, zebra crossings
-  const pq = (x0, z0, x1, z1, color) => flat(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).pnt, x0, z0, x1, z1, 0.012, color);
+  const pq = (x0, z0, x1, z1, color) => flat(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).pnt, x0, z0, x1, z1, 0.03, color);
   for (const ax of avenues) for (let k = 0; k < NROW; k++) {
     const za = streets[k] + STH + 4, zb = streets[k + 1] - STH - 4;
     pq(ax - 0.28, za, ax - 0.1, zb, C.yellow); pq(ax + 0.1, za, ax + 0.28, zb, C.yellow);
@@ -144,8 +146,12 @@ export async function buildCity({ scene, renderer }) {
     for (let s = -AVH + 1; s < AVH - 0.5; s += 1.8) { pq(ax + s, sz - STH - 4, ax + s + 0.9, sz - STH - 1.8, C.white); pq(ax + s, sz + STH + 1.8, ax + s + 0.9, sz + STH + 4, C.white); }
     for (let s = -STH + 0.8; s < STH - 0.5; s += 1.8) { pq(ax - AVH - 4, sz + s, ax - AVH - 1.8, sz + s + 0.9, C.white); pq(ax + AVH + 1.8, sz + s, ax + AVH + 4, sz + s + 0.9, C.white); }
   }
-  // wide outskirts
-  { const big = new GB(); const R = 9000; big.horiz(-R, -R, R, R, -0.05, col(0x56653f)); const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m); }
+  // wide outskirts: a ring AROUND the grid (never under it) so no two ground layers overlap
+  { const big = new GB(), R = 9000, g = col(0x56653f), Y = -0.05, zc = streets[NROW / 2];
+    const x0 = xMin - AVH, x1 = xMax + AVH, z0 = zMin - STH, z1 = zMax + STH;
+    big.horiz(x0, -R, x1, z0, Y, g); big.horiz(x0, z1, x1, R, Y, g); // north / south
+    for (const [a, b] of [[-R, x0], [x1, R]]) { big.horiz(a, -R, b, zc - STH, Y, g); big.horiz(a, zc + STH, b, R, Y, g); } // west / east, with a gap for the road
+    const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m); }
 
   // ---------------------------------------------------------------- buildings
   const solids = new Solids(), zips = new ZipPoints();
@@ -235,15 +241,15 @@ export async function buildCity({ scene, renderer }) {
       im.setMatrixAt(i, _m.compose(_p, _q, _s)); im.setColorAt(i, _c.setRGB(0.85 + h * 0.3, 0.9 + (h * 7 % 1) * 0.2, 0.85 + h * 0.2));
     });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-    im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); root.add(im); treeMeshes.push(im);
+    im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); root.add(im); treeMeshes.push(im); ch.meshes.push(im);
   }
 
   // ---------------------------------------------------------------- chunk meshes
-  const mk = (gb, mat, name, shadow) => { if (gb.empty) return; const m = new THREE.Mesh(gb.build(), mat); m.name = name; m.castShadow = shadow; m.receiveShadow = true; m.matrixAutoUpdate = false; root.add(m); };
+  const mk = (gb, mat, name, shadow, ch) => { if (gb.empty) return; const m = new THREE.Mesh(gb.build(), mat); m.name = name; m.castShadow = shadow; m.receiveShadow = true; m.matrixAutoUpdate = false; root.add(m); ch.meshes.push(m); };
   for (const ch of chunks.values()) {
     const id = ch.cx + '_' + ch.cz;
-    mk(ch.fac, matFacade, 'facade-' + id, true); mk(ch.gls, matGlass, 'glass-' + id, true);
-    mk(ch.gnd, matGround, 'ground-' + id, false); mk(ch.pnt, matPaint, 'paint-' + id, false);
+    mk(ch.fac, matFacade, 'facade-' + id, true, ch); mk(ch.gls, matGlass, 'glass-' + id, true, ch);
+    mk(ch.gnd, matGround, 'ground-' + id, false, ch); mk(ch.pnt, matPaint, 'paint-' + id, false, ch);
   }
   await boot?.stage('coll');
 
@@ -286,6 +292,19 @@ export async function buildCity({ scene, renderer }) {
 
   let time = 0, nk = -1;
   const camParam = new URLSearchParams(location.search).get('cam');
+  // Options > Draw Distance: chunks farther than this are not drawn at all (the haze hides the edge). Live via globalThis.__DRAW_DIST.
+  const DD = { low: 500, medium: 1300, high: 2200 };
+  const bootDD = (() => { try { return DD[readGfx()?.drawDist] ?? Infinity; } catch (e) { return Infinity; } })();
+  const chunkList = [...chunks.values()];
+  const applyDrawDist = (cam) => {
+    const D = globalThis.__DRAW_DIST ?? bootDD;
+    for (const ch of chunkList) {
+      const x0 = ch.cx * CHUNK, z0 = ch.cz * CHUNK;
+      const dx = Math.max(0, x0 - cam.x, cam.x - (x0 + CHUNK)), dz = Math.max(0, z0 - cam.z, cam.z - (z0 + CHUNK));
+      const vis = Math.hypot(dx, dz) < D;
+      if (ch.vis !== vis) { ch.vis = vis; for (const m of ch.meshes) m.visible = vis; }
+    }
+  };
   const world = {
     raycast, groundHeight, surfaceAt, spawn, viewpoints, streetsAt,
     getZipPoints: (center, radius, kinds) => finZ.query(center, radius, kinds),
@@ -298,6 +317,7 @@ export async function buildCity({ scene, renderer }) {
       if (camera) {
         if (camParam) { const f = camParam.split(',').map(Number); camera.position.set(f[0], f[1], f[2]); camera.lookAt(f[3], f[4], f[5]); }
         geoDebug.update(camera);
+        applyDrawDist(camera.position);
       }
     },
   };

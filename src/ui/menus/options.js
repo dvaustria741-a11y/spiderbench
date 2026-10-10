@@ -92,7 +92,7 @@ export function createOptionsPanel(sys, { onClose } = {}) {
       gcho('traffic', 'Vehicle Density', [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], 'How many cars are on the road. Off removes every moving and parked car instantly. Applies instantly.'),
       gcho('buildings', 'City Density', [['normal', 'Normal'], ['sparse', 'Sparse'], ['verysparse', 'Very Sparse']], 'How many buildings fill each block. Sparse leaves wide open spaces between buildings, with fewer trees too, and runs much faster. Landmarks always stay. Needs Apply & Restart.'),
       gcho('lod', 'Level of Detail', LMH, 'How far from you buildings keep full facade detail (windows, trim) before turning into simple blocks. Lower is a big frame-rate gain.'),
-      gcho('drawDist', 'Draw Distance', [['low', 'Low (0.5 km)'], ['medium', 'Medium (1.3 km)'], ['high', 'High (2.2 km)'], ['full', 'Full island']], 'How much of the city is built around the start. Smaller loads faster and uses far less memory.'),
+      gcho('drawDist', 'Draw Distance', [['low', 'Low (0.5 km)'], ['medium', 'Medium (1.3 km)'], ['high', 'High (2.2 km)'], ['full', 'Full island']], 'How far you can see. On Manhattan it sets how much of the city is built around the start (needs Apply & Restart). On the Open City everything beyond it fades into fog and is not drawn, applied instantly.'),
     ],
     audio: [
       sli('masterVolume', 'Master Volume', 0, 1, 0.01, 'Everything.'), sli('musicVolume', 'Music', 0, 1, 0.01, 'Ambient score and the swing pulse.'),
