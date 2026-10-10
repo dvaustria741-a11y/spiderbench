@@ -70,6 +70,15 @@ addEventListener('resize', () => {
 
 const ctx = { THREE, renderer, scene, camera, lighting, world, player, hud, pipeline, input, menuOnly };
 import('./ui/perf.js').then(m => m.initPerf(ctx)).catch(() => {});
+// (perf) Low on the Manhattan map: split the city-wide static meshes into culled cells + honour Draw Distance (see world/chunkify.js)
+if (!menuOnly && MAP !== 'open' && lighting.quality?.fast && !new URLSearchParams(location.search).has('nochunk')) {
+  import('./world/chunkify.js').then(({ chunkifyCity }) => {
+    const root = scene.getObjectByName('city'); if (!root) return;
+    const ch = chunkifyCity(root, { shadowsOn: lighting.quality.shadowsOn !== false });
+    const upd = world.update.bind(world);
+    world.update = (dt, cam) => { upd(dt, cam); ch.update(cam); const D = globalThis.__DRAW_DIST; globalThis.__FOG_END = Number.isFinite(D) && lighting.quality.shadowsOn === false ? D : 0; };
+  }).catch(e => console.warn('[chunkify] failed', e));
+}
 ctx.systems = ctx.systems || []; // C5: game systems (src/game/**) push {update(dt)} here
 window.__ctx = ctx;
 if (!menuOnly && (matchMedia('(pointer: coarse)').matches || params.has('touch'))) import('./ui/touch.js').then(m => m.initTouch(ctx)).catch(e => console.error('[touch] init failed', e));
