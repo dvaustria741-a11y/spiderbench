@@ -4,8 +4,12 @@
 // waypoint, player), filters, district progress, hover cards, waypoint setting and fast travel.
 import * as THREE from 'three';
 import { badgeImage, badge } from './icons.js';
+import { MAP, G } from '../../world/activemap.js';
 
-let PXM = globalThis.__LITE_R ? 0.4 : 0.6;              // base-map pixels per metre (lowered automatically if the big canvas fails to allocate)
+// phones / tablets run the cheap path too (no blend modes, no shadow blur, fewer glitch slices, lower dpr, slower idle redraw)
+const LITE = !!globalThis.__LITE_R || (typeof navigator !== 'undefined' && /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent));
+
+let PXM = LITE ? 0.4 : 0.6;              // base-map pixels per metre (lowered automatically if the big canvas fails to allocate)
 const K_UP = 0.3, K_E = 0.07; // oblique extrusion: map-metres of north / east roof shift per metre of height
 const FONT = '"Spiderbench Condensed", "Barlow Condensed", "Arial Narrow", sans-serif';
 const MAPC = { water0: '#0b2552', water1: '#0a2048', street: '#07122c', road: '#1a2750', avenue: '#223263', pier: '#1e2a4c', block: '#0e1b40', park: '#123f55', tree0: 'rgba(60,150,160,.42)', tree1: 'rgba(90,180,190,.32)', bg: '#0a2048' };
@@ -22,7 +26,7 @@ export function createMapPage(sys) {
     <div class="zoomhint">Wheel / + - &nbsp;zoom<br>Drag / WASD &nbsp;pan<br>Click &nbsp;teleport / set waypoint<br>Right-click &nbsp;clear waypoint<br>C &nbsp;center on Spider-Man</div>
     <div class="card sys-panel cut hide"><small></small><h5></h5><p></p><div class="acts"></div></div>
     <div class="reveal-hint"><small>DISTRICT UNLOCKED</small><b></b><span><span class="sys-key">Esc</span>Continue</span></div>`;
-  const noBlur = c => { if (globalThis.__LITE_R) Object.defineProperty(c, 'shadowBlur', { get: () => 0, set: () => {}, configurable: true }); return c; };
+  const noBlur = c => { if (LITE) Object.defineProperty(c, 'shadowBlur', { get: () => 0, set: () => {}, configurable: true }); return c; };
   const cv = el.querySelector('canvas'), g = noBlur(cv.getContext('2d'));
   const card = el.querySelector('.card'), rowsEl = el.querySelector('.rows');
   const filters = Object.fromEntries(CAT.map(([k]) => [k, true]));
@@ -64,7 +68,7 @@ export function createMapPage(sys) {
     for (const r of f.streets || []) if (r.poly) poly(r.poly, MAPC.avenue); // (layout2) Broadway / angled streets cut across the blocks
     c.lineWidth = Math.max(1, 1.2 * PXM); c.setLineDash([7 * PXM, 7 * PXM]);
     for (const r of f.streets || []) {
-      if (r.poly) continue;
+      if (r.poly || Math.max(r.x1 - r.x0, r.z1 - r.z0) < 60) continue;
       const vert = (r.z1 - r.z0) > (r.x1 - r.x0); c.strokeStyle = r.kind === 'avenue' || r.kind === 'drive' ? 'rgba(245,200,90,.32)' : 'rgba(200,215,255,.16)';
       c.beginPath(); if (vert) { const cx = X((r.x0 + r.x1) / 2); c.moveTo(cx, Z(r.z0)); c.lineTo(cx, Z(r.z1)); } else { const cz = Z((r.z0 + r.z1) / 2); c.moveTo(X(r.x0), cz); c.lineTo(X(r.x1), cz); } c.stroke();
     }
@@ -154,7 +158,7 @@ export function createMapPage(sys) {
   const toSY = (x, y, z) => toS(x + y * K_E, z - y * K_UP); // oblique 3D projection (matches the extruded base map)
   const _cd = new THREE.Vector3();
   const toW = (sx, sy) => [(sx * dpr - W / 2) / (view.s * dpr) + view.x, (sy * dpr - H / 2) / (view.s * dpr) + view.z];
-  const LAND = { x0: -820, x1: 900, z0: -3540, z1: 3390 };
+  const LAND = MAP === 'open' ? { x0: G.X_MIN - 60, x1: G.X_MAX + 60, z0: G.Z_MIN - 60, z1: G.Z_MAX + 60 } : { x0: -820, x1: 900, z0: -3540, z1: 3390 };
   function clampView() {
     const cw = (W || innerWidth * dpr) / dpr, ch = (H || innerHeight * dpr) / dpr;
     const minS = Math.min(cw / (LAND.x1 - LAND.x0), ch / (LAND.z1 - LAND.z0)) * 0.96;
@@ -169,7 +173,8 @@ export function createMapPage(sys) {
     const d = data.districts.find(x => x.id === id); if (!d) return;
     const r = d.rect, x0 = Math.max(r.x0, LAND.x0), x1 = Math.min(r.x1, LAND.x1);
     const cw = cv.getBoundingClientRect().width || innerWidth, ch = cv.getBoundingClientRect().height || innerHeight;
-    view.x = (x0 + x1) / 2; view.z = (r.z0 + r.z1) / 2; view.s = Math.min(cw / (x1 - x0), ch / (r.z1 - r.z0)) * 0.7; clampView();
+    const z0 = Math.max(r.z0, LAND.z0), z1 = Math.min(r.z1, LAND.z1);
+    view.x = (x0 + x1) / 2; view.z = (z0 + z1) / 2; view.s = Math.min(cw / (x1 - x0), ch / (z1 - z0)) * 0.7; clampView();
     revealAnim = { id, t: 0, auto: true }; audio.sfx.district?.();
     const h = el.querySelector('.reveal-hint'); h.querySelector('b').textContent = d.name; h.classList.add('on');
   }
@@ -212,7 +217,7 @@ export function createMapPage(sys) {
     const placed = [];
     for (const d of data.districts) {
       const rx0 = Math.max(d.rect.x0, LAND.x0), rx1 = Math.min(d.rect.x1, LAND.x1);
-      const [sx0, sy0] = toS(rx0, d.rect.z0), [sx1, sy1] = toS(rx1, d.rect.z1);
+      const [sx0, sy0] = toS(rx0, Math.max(d.rect.z0, LAND.z0)), [sx1, sy1] = toS(rx1, Math.min(d.rect.z1, LAND.z1));
       if (sx1 < 0 || sx0 > W || sy1 < 0 || sy0 > H) continue;
       const lock = !revealed(d.id);
       const dw = (sx1 - sx0) * 0.86;
@@ -254,7 +259,7 @@ export function createMapPage(sys) {
     }
   }
   function draw() {
-    const r = cv.getBoundingClientRect(); dpr = globalThis.__LITE_R ? 1 : Math.min(2, devicePixelRatio);
+    const r = cv.getBoundingClientRect(); dpr = globalThis.__LITE_R ? 1 : Math.min(LITE ? 1.25 : 2, devicePixelRatio);
     const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
     W = w; H = h;
@@ -276,20 +281,20 @@ export function createMapPage(sys) {
     pattern = pattern || g.createPattern(pat, 'repeat');
     let hoverD = null; if (mouse && !drag?.moved) { const [wx, wz] = toW(mouse.x, mouse.y); hoverD = data.districtAt(wx, wz); }
     for (const d of data.districts) {
-      const [x0, y0] = toS(Math.max(d.rect.x0, LAND.x0), d.rect.z0), [x1, y1] = toS(Math.min(d.rect.x1, LAND.x1), d.rect.z1);
+      const [x0, y0] = toS(Math.max(d.rect.x0, LAND.x0), Math.max(d.rect.z0, LAND.z0)), [x1, y1] = toS(Math.min(d.rect.x1, LAND.x1), Math.min(d.rect.z1, LAND.z1));
       const rv = revealAnim && revealAnim.id === d.id ? revealAnim : null;
       const k = rv ? THREE.MathUtils.smoothstep(rv.t, 0.4, 2.4) : 0; // 0 = scrambled, 1 = clear
       if (!revealed(d.id) || (rv && k < 1)) {
         g.save(); g.beginPath(); g.rect(x0, y0, x1 - x0, y1 - y0); g.clip();
         // locked: the city is still drawn, but desaturated, darkened and covered in drifting red static
         g.globalAlpha = 1 - k;
-        if (!globalThis.__LITE_R) { g.globalCompositeOperation = 'saturation'; g.fillStyle = '#808080'; g.fillRect(x0, y0, x1 - x0, y1 - y0); } // (perf) the blend modes are very slow on phone GPUs
-        g.globalCompositeOperation = 'source-over'; g.fillStyle = globalThis.__LITE_R ? 'rgba(6,10,26,.55)' : 'rgba(6,10,26,.42)'; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+        if (!LITE) { g.globalCompositeOperation = 'saturation'; g.fillStyle = '#808080'; g.fillRect(x0, y0, x1 - x0, y1 - y0); } // (perf) the blend modes are very slow on phone GPUs
+        g.globalCompositeOperation = 'source-over'; g.fillStyle = LITE ? 'rgba(6,10,26,.55)' : 'rgba(6,10,26,.42)'; g.fillRect(x0, y0, x1 - x0, y1 - y0);
         const off = (time * 9) % 48; g.translate(off, 0); g.fillStyle = pattern; g.fillRect(x0 - 48 - off, y0, x1 - x0 + 96, y1 - y0); g.translate(-off, 0);
         // signal glitch: blocks of the district flicker / shear sideways (deterministic per 0.12 s tick)
         let sd = Math.floor(time * 8) * 131 + d.id.charCodeAt(0) * 7; const rn = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
         g.globalAlpha = 1 - k;
-        for (let i = 0; i < (globalThis.__LITE_R ? 2 : 10); i++) { // (perf) lite: 2 glitch slices, not 10 big-canvas copies per district
+        for (let i = 0; i < (LITE ? 2 : 10); i++) { // (perf) lite: 2 glitch slices, not 10 big-canvas copies per district
           const gy = y0 + rn() * (y1 - y0), gh = (4 + rn() * 22) * dpr, sh = (rn() - 0.5) * 40 * dpr;
           if (base && rn() < 0.6) { const [bsx, bsy] = toS(bx0, bz0), sc = view.s * dpr / PXM, src = baseMips?.[0] || base;
             g.drawImage(src, (x0 - bsx) / sc, (gy - bsy) / sc, (x1 - x0) / sc, gh / sc, x0 + sh, gy, x1 - x0, gh); }
@@ -489,7 +494,7 @@ export function createMapPage(sys) {
       if (held.has('KeyA') || held.has('ArrowLeft')) view.x -= sp; if (held.has('KeyD') || held.has('ArrowRight')) view.x += sp;
       if (held.size) clampView();
       travel.update(0);
-      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > (globalThis.__LITE_R ? 0.5 : 0.25)) { drawAcc = 0; dirty = false; const t0 = performance.now(); draw(); window.__mapMs = performance.now() - t0; } // 10 Hz idle redraw (the canvas was fully repainted every frame)
+      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > (LITE ? 0.5 : 0.25)) { drawAcc = 0; dirty = false; const t0 = performance.now(); draw(); window.__mapMs = performance.now() - t0; } // 10 Hz idle redraw (the canvas was fully repainted every frame)
       if (pulse > 0.25) { pulse = 0; updateLegend(); }
     },
   };
