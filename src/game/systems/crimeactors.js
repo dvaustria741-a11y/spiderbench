@@ -154,7 +154,17 @@ export function createActors(ctx) {
 
   return {
     ready: load, spawn, get loaded() { return !!gltf; }, actors,
-    update(dt) { for (const a of actors) a.update(dt); },
+    update(dt) {
+      // (perf) every thug / victim is a ~56k-triangle skinned mesh: beyond CULL_DIST they are not drawn at all (and not
+      // animated), so a crime 150 m away costs nothing; Low cuts closer
+      const cam = ctx.camera, cd = ctx.quality?.fast || ctx.lighting?.quality?.fast ? 55 : 95;
+      for (const a of actors) {
+        let far = false;
+        if (cam) { const dx = a.root.position.x - cam.position.x, dz = a.root.position.z - cam.position.z, dy = a.root.position.y - cam.position.y; far = dx * dx + dz * dz + dy * dy > cd * cd; }
+        if (a.root.visible === far) a.root.visible = !far;
+        a.update(dt); // AI / movement keep ticking, only the drawing is skipped
+      }
+    },
   };
 }
 
