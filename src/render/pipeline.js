@@ -1075,6 +1075,7 @@ void main() {
   };
   const final = new FSPass({
     name: 'final',
+    defines: Q.fast ? { FAST: '' } : {},
     uniforms: {
       uColor: { value: null }, uBloom: { value: null }, uPx: { value: new THREE.Vector2() },
       uStreakSrc: { value: null }, uStreakLo: { value: null }, uStreak: { value: 0 }, uStreakT: { value: 2.5 }, // (night) anamorphic lamp streaks
@@ -1147,6 +1148,9 @@ vec3 tmS(vec3 c) { return c / (1.0 + luma(c)); }
 vec3 itmS(vec3 c) { return c / max(1.0 - luma(c), 1e-4); }
 void main() {
   vec2 d = vUv - 0.5;
+#ifdef FAST
+  vec3 c = texture(uColor, vUv).rgb; // (fast post) one fetch: no sharpen / CA / depth read
+#else
   // sharpen (in a compressed domain to avoid halos on HDR edges)
   vec3 c0 = tmS(texture(uColor, vUv).rgb);
   vec3 n = tmS(texture(uColor, vUv + vec2(0.0, uPx.y)).rgb), s = tmS(texture(uColor, vUv - vec2(0.0, uPx.y)).rgb);
@@ -1164,11 +1168,13 @@ void main() {
   vec2 cao = d * dot(d, d) * uCA * 4.0 * smoothstep(0.3, 0.7, length(d * vec2(uAspect, 1.0))); // edges only
   c.r = mix(c.r, texture(uColor, vUv - cao).r, 0.85);
   c.b = mix(c.b, texture(uColor, vUv + cao).b, 0.85);
+#endif
   // bloom (energy-conserving mix)
   vec3 b = texture(uBloom, vUv).rgb;
   c += b * uBloomStr; // (lighting2 r1) additive thresholded bloom
   // (night) anamorphic streak (street ref: thin cool horizontal streaks through lamp heads / headlights): the half-res
   // radiance above a high threshold, smeared horizontally with an exponential falloff
+#ifndef FAST
   if (uStreak > 0.0) {
     vec3 st = vec3(0.0);
     for (int k = 1; k <= 12; k++) {
@@ -1182,6 +1188,7 @@ void main() {
     c += dot(st, vec3(0.3, 0.5, 0.2)) * vec3(0.45, 0.62, 1.0) * uStreak;
   }
   c += lensFlare(vUv);
+#endif
   float ev = 0.0;
   if (uAEOn > 0.5) ev = clamp(-(texture(uAE, vec2(0.5)).r - uAEKey) * uAEStr, -uAERange, uAERange);
   c *= uExposure * exp2(ev) * uWB;
@@ -1196,6 +1203,7 @@ void main() {
     tt /= dot(tt, vec3(0.2126, 0.7152, 0.0722));
     c *= tt;
   }
+#ifndef FAST
   if (uRain > 0.0) { // (lighting2 r3) overcast preset: cheap screen-space rain streaks (2 layers, slanted, falling)
     float rr = 0.0, tt = uFrame / 60.0;
     for (int i = 0; i < 2; i++) {
@@ -1209,6 +1217,7 @@ void main() {
     }
     c = mix(c, vec3(0.72, 0.75, 0.8), clamp(rr * 0.11 * uRain, 0.0, 1.0));
   }
+#endif
   // grade (display-linear): lift/gamma/gain, contrast, saturation
   c = max(uGain * (c + uLift * (1.0 - c)), 0.0);
   c = pow(max(c, 0.0), 1.0 / uGamma);
@@ -1557,7 +1566,7 @@ void main() { vec4 t = texture(uSrc, vUv); vec3 c = uMode > 0.5 ? vec3(t.a - 1.0
     }
 
     // --- motion blur
-    if (mbState.strength > 0.001 && (mbState.fade > 0.001 || mbState.velocity || mbState.angular)) {
+    if (!Q.fast && mbState.strength > 0.001 && (mbState.fade > 0.001 || mbState.velocity || mbState.angular)) {
       let pvp = prevViewProj;
       if (mbState.velocity || mbState.angular) {
         // synthetic previous camera: undo `velocity * (1/60)` translation and `angular * (1/60)` rotation

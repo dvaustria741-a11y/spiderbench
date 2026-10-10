@@ -50,5 +50,8 @@ export function getQuality() {
     const qs = new URLSearchParams(location.search).get('qset');
     if (qs) for (const kv of qs.split(',')) { const [k, v] = kv.split(':'); if (k in _q) _q[k] = v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v; }
   } catch (e) { /* non-browser */ }
+  // (perf) fast post: when every heavy screen-space effect is off (Low), also drop motion blur, sharpen / CA / flare and use a 3-level bloom
+  _q.fast = !_q.ao && !_q.ssr && !_q.ssgi && !_q.shafts && !new URLSearchParams(location.search).has('nofast');
+  if (_q.fast) _q.bloomLevels = Math.min(_q.bloomLevels, 3);
   return _q;
 }
