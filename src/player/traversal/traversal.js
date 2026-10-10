@@ -533,7 +533,7 @@ export function createTraversal({ world, cam, web, rig, camera }) {
   }
   // Water (river beyond the seawall; floor below -1 m): Spidey never lands on / runs across water. On contact he
   // splashes and immediately web-yanks himself back onto the nearest dry ground on a ballistic arc.
-  const WATER_Y = -1.0;
+  const WATER_Y = world.swimY != null ? world.swimY - 0.6 : -1.0; // open map: swim only where the ground is really under water (the shore now slopes)
   function waterBounce() {
     if (world.swimY != null) return enterSwim(); // open map: real water, he swims
     let best = null, bd = Infinity;

@@ -41,7 +41,7 @@ export const NCOL = AVENUES.length - 1, NROW = STREETS.length - 1;
 export const G = {
   AV_ROAD: 20, AV_WALK: 5, AV_SP: 200,
   ST_SP: 170, ST_ROAD: 12, ST_WALK: 4,
-  CURB_H: 0.15, WATER_Y: -1.6,
+  CURB_H: 0.15, WATER_Y: -2.6,
   X_MIN: BOUNDS.x0, X_MAX: BOUNDS.x1,
   Z_MIN: BOUNDS.z0, Z_MAX: BOUNDS.z1,
   LAND_MARGIN: 600,

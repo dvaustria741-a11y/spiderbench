@@ -104,7 +104,8 @@ export async function buildCity({ scene, renderer }) {
   skinGround(matGround, skin); skinGround(matPaint, skin);
 
   // open water: one big plane with low animated waves (normal-only, so it stays cheap). The player can swim in it (world.swimY).
-  const SWIM_Y = -1.6, SEABED = SWIM_Y - 2.4;
+  const SWIM_Y = -2.6, SEABED = SWIM_Y - 2.4; // water surface (was -1.6: lowered 1 m) and the sea floor the shore slopes down to
+  const SLOPE_RUN = 1.4; // shore slope: metres of run per metre of drop (1.4 = ~35 degrees, like Spider Fuser's embankments)
   const waterU = { uWT: { value: 0 } };
   const matWater = new THREE.MeshStandardMaterial({ color: 0x2f5870, roughness: 0.16, metalness: 0 });
   matWater.onBeforeCompile = (sh) => {
@@ -215,20 +216,35 @@ export async function buildCity({ scene, renderer }) {
   meshLayer('plaza', LY.PAVE, CH);
   meshLayer('park', LY.GRASS, CH + 0.02);
   // vertical walls along smooth polylines (outside on the right of travel): kerbs between road and block, sea wall between land and water
-  const wallLines = (key, y0, y1, layer, sc) => {
+  // run > 0 turns the vertical wall into a slope: the top edge stays on the land edge (y1), the bottom edge sits `run` metres out into the water (y0)
+  const wallLines = (key, y0, y1, layer, sc, run = 0) => {
     const [pb, lens] = LINES[key]; if (!lens.length) return;
     const P = i16(pb), gb = new GB(); let o = 0;
+    const H = y1 - y0, slant = run > 0 ? Math.hypot(H, run) / H : 1; // texture v follows the slope length
+    const push = (x, y, z, s_, N) => {
+      gb.p.push(x, y, z); gb.n.push(N[0], N[1], N[2]);
+      if (TEX) { gb.u.push(layer, 0); gb.c.push(s_ / sc, y * slant / sc, 0); } else { gb.u.push(99, 0); gb.c.push(C.curb[0], C.curb[1], C.curb[2]); }
+    };
     for (const n of lens) {
-      let acc = 0;
+      let acc = 0, pnx = 0, pnz = 0, have = false;
       for (let k = 0; k < n - 1; k++) {
         const ax = P[2 * (o + k)] / 16, az = P[2 * (o + k) + 1] / 16, bx = P[2 * (o + k + 1)] / 16, bz = P[2 * (o + k + 1) + 1] / 16;
         const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.05) continue;
         const nx = dz / L, nz = -dx / L, s0 = acc, s1 = acc + L; acc = s1;
-        const V = [[bx, y0, bz, s1, y0], [ax, y0, az, s0, y0], [ax, y1, az, s0, y1], [bx, y1, bz, s1, y1]];
-        for (const i of [0, 1, 2, 0, 2, 3]) {
-          const v = V[i]; gb.p.push(v[0], v[1], v[2]); gb.n.push(nx, 0, nz);
-          if (TEX) { gb.u.push(layer, 0); gb.c.push(v[3] / sc, v[4] / sc, 0); } else { gb.u.push(99, 0); gb.c.push(C.curb[0], C.curb[1], C.curb[2]); }
+        let N = [nx, 0, nz];
+        if (run > 0) { const q = Math.hypot(nx * H / run, 1, nz * H / run); N = [nx * H / run / q, 1 / q, nz * H / run / q]; }
+        const V = [[bx + nx * run, y0, bz + nz * run, s1], [ax + nx * run, y0, az + nz * run, s0], [ax, y1, az, s0], [bx, y1, bz, s1]];
+        for (const i of [0, 1, 2, 0, 2, 3]) { const v = V[i]; push(v[0], v[1], v[2], v[3], N); }
+        // convex corner: the two offset slopes fan apart, so close the gap with a wedge (hidden under the other slopes on concave corners)
+        if (run > 0 && have && Math.hypot(pnx - nx, pnz - nz) > 1e-3) {
+          let A = [ax + pnx * run, y0, az + pnz * run], B = [ax + nx * run, y0, az + nz * run]; const T = [ax, y1, az];
+          const ux = A[0] - T[0], uy = A[1] - T[1], uz = A[2] - T[2], vx = B[0] - T[0], vy = B[1] - T[1], vz = B[2] - T[2];
+          let cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+          if (cy < 0) { [A, B] = [B, A]; cx = -cx; cy = -cy; cz = -cz; }
+          const cl = Math.hypot(cx, cy, cz) || 1, WN = [cx / cl, cy / cl, cz / cl];
+          push(T[0], T[1], T[2], s0, WN); push(A[0], A[1], A[2], s0, WN); push(B[0], B[1], B[2], s0, WN);
         }
+        pnx = nx; pnz = nz; have = true;
       }
       o += n;
     }
@@ -243,12 +259,14 @@ export async function buildCity({ scene, renderer }) {
   { const U = [[99, 0], [99, 0], [99, 0], [99, 0]], y0 = SEABED, y1 = CH;
     const wm = new THREE.Mesh(new THREE.PlaneGeometry(18000, 18000).rotateX(-Math.PI / 2), matWater);
     wm.position.y = SWIM_Y; wm.frustumCulled = false; wm.receiveShadow = true; wm.name = 'water'; root.add(wm);
-    wallLines('sea', y0, y1, LY.KERB, 3);
+    wallLines('sea', y0, y1, LY.KERB, 3, (y1 - y0) * SLOPE_RUN); // sloped shore instead of a vertical sea wall
     const rx0 = X0, rx1 = X0 + NX * CELL;
     for (const [a, b, e] of [[rx0 - 1500, rx0, EXITS.W], [rx1, rx1 + 1500, EXITS.E]]) for (let x = a; x < b; x += 300) {
       const xa = x, xb = Math.min(b, x + 300), zN = e.z - e.half, zS = e.z + e.half, gb = chunkOf((xa + xb) / 2, e.z).gnd;
       tq(xa, zN, xb, zS, LY.ASPH, W(SC[0]));
-      gb.quad([xb, y0, zN], [xa, y0, zN], [xa, 0, zN], [xb, 0, zN], [0, 0, -1], U, C.curb); gb.quad([xa, y0, zS], [xb, y0, zS], [xb, 0, zS], [xa, 0, zS], [0, 0, 1], U, C.curb);
+      // causeway sides slope down into the water too (top edge at road level y = 0)
+      const R0 = (0 - y0) * SLOPE_RUN, q0 = Math.hypot(-y0 / R0, 1), sN = [0, 1 / q0, -(-y0 / R0) / q0], sS = [0, 1 / q0, (-y0 / R0) / q0];
+      gb.quad([xb, y0, zN - R0], [xa, y0, zN - R0], [xa, 0, zN], [xb, 0, zN], sN, U, C.curb); gb.quad([xa, y0, zS + R0], [xb, y0, zS + R0], [xb, 0, zS], [xa, 0, zS], sS, U, C.curb);
     } }
   function tq(x0, z0, x1, z1, layer, f) { texq(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd, x0, z0, x1, z1, 0, layer, f); }
 
@@ -405,11 +423,37 @@ export async function buildCity({ scene, renderer }) {
   await boot?.stage('coll');
 
   // ---------------------------------------------------------------- queries
+  // shore slope (collision / swim depth): same plane as the visible slope, measured from the sea-wall polylines
+  const SEA = (() => {
+    const [pb, lens] = LINES.sea, P = i16(pb), HC = 16, map = new Map(), R = (CH - SEABED) * SLOPE_RUN; let o = 0;
+    const key = (a, b) => (a + 4096) * 8192 + (b + 4096);
+    for (const n of lens) {
+      for (let k = 0; k < n - 1; k++) {
+        const seg = [P[2 * (o + k)] / 16, P[2 * (o + k) + 1] / 16, P[2 * (o + k + 1)] / 16, P[2 * (o + k + 1) + 1] / 16];
+        const i0 = Math.floor((Math.min(seg[0], seg[2]) - R) / HC), i1 = Math.floor((Math.max(seg[0], seg[2]) + R) / HC);
+        const j0 = Math.floor((Math.min(seg[1], seg[3]) - R) / HC), j1 = Math.floor((Math.max(seg[1], seg[3]) + R) / HC);
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const kk = key(i, j); let l = map.get(kk); if (!l) map.set(kk, l = []); l.push(seg); }
+      }
+      o += n;
+    }
+    return { map, HC, key };
+  })();
+  const seaDist = (x, z) => {
+    const l = SEA.map.get(SEA.key(Math.floor(x / SEA.HC), Math.floor(z / SEA.HC))); if (!l) return Infinity;
+    let best = Infinity;
+    for (const [ax, az, bx, bz] of l) {
+      const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz, t = L2 > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)) : 0;
+      const d = Math.hypot(x - (ax + t * dx), z - (az + t * dz)); if (d < best) best = d;
+    }
+    return best;
+  };
+  const slopeH = (top, d) => d >= (top - SEABED) * SLOPE_RUN ? SEABED : top - d / SLOPE_RUN;
   const terrainHeight = (x, z) => {
     const c = cellAt(x, z);
-    if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; return Math.abs(z - e.z) < e.half && Math.abs(x) < 2600 ? 0 : SEABED; }
+    if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; if (Math.abs(x) >= 2600) return SEABED; const dz = Math.abs(z - e.z) - e.half; return dz < 0 ? 0 : slopeH(0, dz); }
     if (c >= CLS.AV && c <= CLS.INT) return 0;
-    return c === CLS.OUT ? SEABED : c === CLS.PARK ? CH + 0.02 : CH;
+    if (c !== CLS.OUT) return c === CLS.PARK ? CH + 0.02 : CH;
+    return slopeH(CH, seaDist(x, z));
   };
   const grid = new CollisionGrid(solids, 24);
   const finZ = zips.finalize(grid);
