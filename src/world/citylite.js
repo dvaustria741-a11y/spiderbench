@@ -10,7 +10,7 @@ import { attachLife } from './npc/life.js';
 import { nightK } from '../render/daynight.js';
 import { readGfx } from '../render/gfxprefs.js';
 
-const CHUNK = 400;
+const CHUNK = 200; // smaller chunks = Draw Distance cuts closer to the exact radius (400 let buildings up to ~400 m past it stay drawn)
 const BAY = 3.2, FLOOR = 3.6;
 const col = (hex) => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
 
