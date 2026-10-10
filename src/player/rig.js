@@ -4,6 +4,7 @@
 // - Rig-agnostic procedural poses authored in *character space* (X = left, Y = up, Z = forward),
 //   used for any state that has no GLB clip, for shot poses, and as additive layers (lean, arm-to-anchor).
 import * as THREE from 'three';
+import { getQuality } from '../render/quality.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { Animator } from './anim/animator.js';
@@ -233,7 +234,7 @@ export const POSES = {
 // ---------------------------------------------------------------- rig
 export async function loadCharacter(renderer) {
   let gltf = null, source = 'placeholder';
-  const url = new URLSearchParams(location.search).get('char') || '/assets/spiderman.glb';
+  const url = new URLSearchParams(location.search).get('char') || (getQuality().fast ? '/assets/spiderman_low.glb' : '/assets/spiderman.glb');
   try {
     // single request: a missing file (or the dev server's HTML fallback) makes GLTFLoader throw -> placeholder below
     const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);

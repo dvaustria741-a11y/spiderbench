@@ -5,6 +5,7 @@
 // Actors are plain objects so the combat module can take them over (crime.enemies[i].actor / .object):
 //   set actor.external = true and drive actor.root / actor.mixer yourself; this module then only ticks the mixer.
 import * as THREE from 'three';
+import { getQuality } from '../../render/quality.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
@@ -60,7 +61,7 @@ export function createActors(ctx) {
   function load() {
     if (loading) return loading;
     const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
-    loading = loader.loadAsync('/assets/thug.glb').then(g => {
+    loading = loader.loadAsync(getQuality().fast ? '/assets/thug_low.glb' : '/assets/thug.glb').then(g => {
       gltf = g; clipList();
       g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
       return true;
