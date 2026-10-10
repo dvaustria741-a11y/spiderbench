@@ -52,6 +52,7 @@ const scene = new THREE.Scene();
 // far plane 150 km (foundation agent): the harbour, far shores and distant hinterland run out to the (fogged) true
 // horizon instead of being clipped into a hard band at 6 km (reversed float depth keeps precision at this range)
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 150000);
+if (!renderer.capabilities.reversedDepthBuffer) { camera.near = 0.4; camera.updateProjectionMatrix(); } // phones without reversed depth: a 0.1 near plane + 150 km far plane makes flat ground layers z-fight (grass through roads)
 
 const lighting = createLighting({ renderer, scene });
 const world = menuOnly ? buildMenuWorld() : await (MAP === 'open' ? import('./world/citylite.js') : import('./world/city.js')).then(m => m.buildCity({ scene, renderer }));

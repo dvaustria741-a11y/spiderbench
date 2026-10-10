@@ -147,7 +147,7 @@ export async function buildCity({ scene, renderer }) {
     for (let s = -STH + 0.8; s < STH - 0.5; s += 1.8) { pq(ax - AVH - 4, sz + s, ax - AVH - 1.8, sz + s + 0.9, C.white); pq(ax + AVH + 1.8, sz + s, ax + AVH + 4, sz + s + 0.9, C.white); }
   }
   // wide outskirts: a ring AROUND the grid (never under it) so no two ground layers overlap
-  { const big = new GB(), R = 9000, g = col(0x56653f), Y = -0.05, zc = streets[NROW / 2];
+  { const big = new GB(), R = 9000, g = col(0x56653f), Y = -0.35, zc = streets[NROW / 2];
     const x0 = xMin - AVH, x1 = xMax + AVH, z0 = zMin - STH, z1 = zMax + STH;
     big.horiz(x0, -R, x1, z0, Y, g); big.horiz(x0, z1, x1, R, Y, g); // north / south
     for (const [a, b] of [[-R, x0], [x1, R]]) { big.horiz(a, -R, b, zc - STH, Y, g); big.horiz(a, zc + STH, b, R, Y, g); } // west / east, with a gap for the road
@@ -298,6 +298,7 @@ export async function buildCity({ scene, renderer }) {
   const chunkList = [...chunks.values()];
   const applyDrawDist = (cam) => {
     const D = globalThis.__DRAW_DIST ?? bootDD;
+    globalThis.__FOG_END = Number.isFinite(D) ? D : 0; // pipeline fades everything into fog before the cut
     for (const ch of chunkList) {
       const x0 = ch.cx * CHUNK, z0 = ch.cz * CHUNK;
       const dx = Math.max(0, x0 - cam.x, cam.x - (x0 + CHUNK)), dz = Math.max(0, z0 - cam.z, cam.z - (z0 + CHUNK));

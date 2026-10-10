@@ -526,7 +526,7 @@ void main() {
       uProjInv: { value: new THREE.Matrix4() }, uReversed: { value: reversed ? 1 : 0 },
       uCamWorld: { value: new THREE.Matrix4() }, uCamPos: { value: new THREE.Vector3() },
       uFogDensity: { value: 0 }, uFogFalloff: { value: 0 }, uFogSun: { value: 0 }, uFogTint: { value: new THREE.Color() },
-      uFogStart: { value: 0 }, uPx: { value: new THREE.Vector2() },
+      uFogStart: { value: 0 }, uDrawEnd: { value: 0 }, uPx: { value: new THREE.Vector2() },
       uSceneA: { value: sceneRT.texture }, uSSR: { value: ssrRT.texture }, uSSROn: { value: 0 },
       uShafts: { value: shaftRT.texture }, uShaftOn: { value: 0 }, uHalfPx: { value: new THREE.Vector2() },
       uCVol: { value: cvolRT.texture }, uCVolOn: { value: 0 }, uQuarterPx: { value: new THREE.Vector2() }, // (night) city-light haze
@@ -556,7 +556,7 @@ float hazeInt(float y0, float dy, float a, float b, float H) {
 // point crosses the cloud layer (same noise / coverage as sky.js cloudDensity, lower cloud band)
 uniform sampler3D uNoise; uniform float uCloudCoverage, uCloudBottom, uCloudTop, uCloudShadow, uCloudScale; uniform vec3 uCloudOffset;
 uniform mat4 uCamWorld; uniform vec3 uCamPos; uniform vec2 uPx, uHalfPx;
-uniform float uFogDensity, uFogFalloff, uFogSun, uFogStart, uSSROn, uShaftOn; uniform vec3 uFogTint;
+uniform float uFogDensity, uFogFalloff, uFogSun, uFogStart, uDrawEnd, uSSROn, uShaftOn; uniform vec3 uFogTint;
 ${GLSL_DEPTH}
 ${GLSL_SKY_COMMON}
 vec3 fogColor(vec3 dir, float sunVis) {
@@ -698,6 +698,8 @@ void main() {
   fogC = mix(fogC, skyLUT(normalize(vec3(dir.x, 0.012, dir.z))), smoothstep(9000.0, 45000.0, dist));
   if (uNightFog > 0.0) fogC = mix(fogC, uNightMid, uNightFog * smoothstep(120.0, 350.0, dist) * (1.0 - smoothstep(900.0, 2200.0, dist))); // (night r6) moonlit blue atmosphere in the 150-900 m band (rooftop_haze ref), purple light-pollution haze beyond
   col = col * T + fogC * (1.0 - T);
+  // Draw Distance (Open City): everything fades into the fog colour before the draw-distance cut, so nothing pops in or out
+  if (uDrawEnd > 0.0 && dist < 149000.0) col = mix(col, fogC, smoothstep(uDrawEnd * 0.5, uDrawEnd * 0.94, dist));
   if (uShaftOn > 0.5) col += upsampleShafts(vUv, dist);
   if (uCVolOn > 0.5) col += upsampleHalf(uCVol, vUv, dist, uQuarterPx);
   // (night) street-level glow: the low haze layer (y < uGlowH) in the street canyons scatters the lamp / shop / car
@@ -1497,7 +1499,7 @@ void main() { vec4 t = texture(uSrc, vUv); vec3 c = uMode > 0.5 ? vec3(t.a - 1.0
       u.uMoonDir.value.copy(lighting.moon?.dir ?? u.uMoonDir.value); u.uMoonK.value = lighting.moon?.k ?? 0; // (daynight)
       { const nh = lighting.nightHaze; u.uNightFog.value = nh ? nh.k : 0; if (nh) { u.uNightHaze.value.fromArray(nh.low); u.uNightHazeHi.value.fromArray(nh.high); u.uGlowCol.value.fromArray(nh.cfg.glowCol); u.uGlowH.value = nh.cfg.glowH; u.uGlowK.value = nh.cfg.glowK; } } // (night)
       u.uFogDensity.value = f.density; u.uFogFalloff.value = f.heightFalloff; u.uFogSun.value = f.sunScatter;
-      u.uFogTint.value.copy(f.tint); u.uFogStart.value = f.startDistance;
+      u.uFogTint.value.copy(f.tint); u.uFogStart.value = f.startDistance; u.uDrawEnd.value = globalThis.__FOG_END ?? 0;
       u.uSSROn.value = doSSR ? 1 : 0;
       u.uGIOn.value = doGI ? 1 : 0; u.uGIAbs.value = lighting.nightHaze?.k ?? 0; u.uGIAlb.value = grade.giNightAlbedo / Math.PI; // (night)
       u.uShaftOn.value = doShafts && shafts.uniforms.uSM0.value ? 1 : 0;
