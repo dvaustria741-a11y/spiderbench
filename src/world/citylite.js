@@ -4,6 +4,7 @@
 // Solids / CollisionGrid / ZipPoints as the Manhattan map, so swinging, wall-running, zipping and combat behave the same.
 import * as THREE from 'three';
 import { createOpenTraffic } from './opentraffic.js';
+import { loadOpenSkin, skinGround, skinRoof, skinTree } from './openskin.js';
 import { loadVehicleModels } from './vehicles.js';
 import { G, avenues, streets, blocks, generateLots, streetsAt, hash2, mulberry32, KINDS, NCOL, NROW, inPark } from './openmap.js';
 import { Solids, CollisionGrid, makeQueries, collisionDebugLines } from './collision.js';
@@ -89,27 +90,30 @@ export async function buildCity({ scene, renderer }) {
   const boot = globalThis.__boot; await boot?.stage('gen');
   const root = new THREE.Group(); root.name = 'city'; scene.add(root);
 
+  const skin = await loadOpenSkin(); // (Manhattan ground / roof / leaf detail, null with ?noskin or when the textures are missing)
   const tx = { punched: makeWindowTextures(false), glass: makeWindowTextures(true) };
   const matFacade = new THREE.MeshStandardMaterial({ map: tx.punched.map, emissiveMap: tx.punched.emissive, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true, roughness: 0.88, metalness: 0 });
   const matGlass = new THREE.MeshStandardMaterial({ map: tx.glass.map, emissiveMap: tx.glass.emissive, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true, roughness: 0.32, metalness: 0.15 });
   const matGround = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
   const matPaint = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 
+  skinGround(matGround, skin); skinRoof(matFacade, skin); skinRoof(matGlass, skin);
+
   // chunk store: one set of builders per 400 m cell
   const chunks = new Map();
   const chunkOf = (x, z) => {
     const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK), k = cx * 1000 + cz;
-    let c = chunks.get(k); if (!c) chunks.set(k, c = { cx, cz, fac: new GB(), gls: new GB(), gnd: new GB(), pnt: new GB(), trees: [], meshes: [] });
+    let c = chunks.get(k); if (!c) chunks.set(k, c = { cx, cz, fac: new GB(), gls: new GB(), gnd: new GB(), pnt: new GB(), trees: [], props: [], meshes: [] });
     return c;
   };
 
   // ---------------------------------------------------------------- ground
   const C = { road: col(0x2b2d31), walk: col(0x9c9b95), curb: col(0x74736f), plaza: col(0xb9b5a8), yard: col(0x8a8c85), lot: col(0x3b3c3f), grass: col(0x4d6a38), dirt: col(0x6b6a5c), yellow: col(0xd9b43a), white: col(0xe8e8e2) };
-  const flat = (gb, x0, z0, x1, z1, y, color) => gb.horiz(x0, z0, x1, z1, y, color);
+  const flat = (gb, x0, z0, x1, z1, y, color, surf = 4) => gb.horiz(x0, z0, x1, z1, y, color, true, [surf, 0]); // uv.x = surface id for the ground skin (0 asphalt, 1 sidewalk, 2 grass, 4 none)
   const AVH = G.AV_HALF, STH = G.ST_HALF, CH = G.CURB_H;
   const xMin = avenues[0], xMax = avenues[NCOL], zMin = streets[0], zMax = streets[NROW];
   // roads: per avenue row segments + intersections + street gaps; chunked by centre
-  const roadRect = (x0, z0, x1, z1) => flat(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd, x0, z0, x1, z1, 0, C.road);
+  const roadRect = (x0, z0, x1, z1) => flat(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd, x0, z0, x1, z1, 0, C.road, 0);
   for (const ax of avenues) for (let k = 0; k <= NROW; k++) {
     roadRect(ax - AVH, streets[k] - STH, ax + AVH, streets[k] + STH); // intersection
     if (k < NROW) roadRect(ax - AVH, streets[k] + STH, ax + AVH, streets[k + 1] - STH);
@@ -124,14 +128,14 @@ export async function buildCity({ scene, renderer }) {
   // leaves almost no depth precision), which showed the grass through the roads.
   for (const B of blocks) {
     const gb = chunkOf(B.cx, B.cz).gnd, kind = B.kind;
-    flat(gb, B.x0, B.z0, B.x1, B.pz0, CH, C.walk); flat(gb, B.x0, B.pz1, B.x1, B.z1, CH, C.walk);
-    flat(gb, B.x0, B.pz0, B.px0, B.pz1, CH, C.walk); flat(gb, B.px1, B.pz0, B.x1, B.pz1, CH, C.walk);
+    flat(gb, B.x0, B.z0, B.x1, B.pz0, CH, C.walk, 1); flat(gb, B.x0, B.pz1, B.x1, B.z1, CH, C.walk, 1);
+    flat(gb, B.x0, B.pz0, B.px0, B.pz1, CH, C.walk, 1); flat(gb, B.px1, B.pz0, B.x1, B.pz1, CH, C.walk, 1);
     for (const [ax, az, bx, bz, n] of [[B.x0, B.z1, B.x1, B.z1, [0, 0, -1]], [B.x1, B.z0, B.x0, B.z0, [0, 0, 1]], [B.x0, B.z0, B.x0, B.z1, [1, 0, 0]], [B.x1, B.z1, B.x1, B.z0, [-1, 0, 0]]]) {
-      gb.quad([ax, 0, az], [bx, 0, bz], [bx, CH, bz], [ax, CH, az], [-n[0], 0, -n[2]], [[0, 0], [0, 0], [0, 0], [0, 0]], C.curb); // kerb face
+      gb.quad([ax, 0, az], [bx, 0, bz], [bx, CH, bz], [ax, CH, az], [-n[0], 0, -n[2]], [[4, 0], [4, 0], [4, 0], [4, 0]], C.curb); // kerb face
     }
     const iy = kind === KINDS.KIND_PARK ? CH + 0.02 : CH;
     const ic = kind === KINDS.KIND_PARK ? C.grass : kind === KINDS.KIND_PLAZA ? C.plaza : kind === KINDS.KIND_LOT ? C.lot : (B.h < 0.45 ? C.yard : C.dirt);
-    flat(gb, B.px0, B.pz0, B.px1, B.pz1, iy, ic);
+    flat(gb, B.px0, B.pz0, B.px1, B.pz1, iy, ic, kind === KINDS.KIND_PARK || (kind !== KINDS.KIND_PLAZA && kind !== KINDS.KIND_LOT && B.h >= 0.45) ? 2 : kind === KINDS.KIND_LOT ? 0 : 1);
   }
   // road paint: avenue centre (double yellow) + dashed lane lines, street centre dashes, zebra crossings
   const pq = (x0, z0, x1, z1, color) => flat(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).pnt, x0, z0, x1, z1, 0.03, color);
@@ -151,8 +155,9 @@ export async function buildCity({ scene, renderer }) {
   // wide outskirts: a ring AROUND the grid (never under it) so no two ground layers overlap
   { const big = new GB(), R = 9000, g = col(0x56653f), Y = -0.35, zc = streets[NROW / 2];
     const x0 = xMin - AVH, x1 = xMax + AVH, z0 = zMin - STH, z1 = zMax + STH;
-    big.horiz(x0, -R, x1, z0, Y, g); big.horiz(x0, z1, x1, R, Y, g); // north / south
-    for (const [a, b] of [[-R, x0], [x1, R]]) { big.horiz(a, -R, b, zc - STH, Y, g); big.horiz(a, zc + STH, b, R, Y, g); } // west / east, with a gap for the road
+    const GU = [2, 0];
+    big.horiz(x0, -R, x1, z0, Y, g, true, GU); big.horiz(x0, z1, x1, R, Y, g, true, GU); // north / south
+    for (const [a, b] of [[-R, x0], [x1, R]]) { big.horiz(a, -R, b, zc - STH, Y, g, true, GU); big.horiz(a, zc + STH, b, R, Y, g, true, GU); } // west / east, with a gap for the road
     const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m); }
 
   // ---------------------------------------------------------------- buildings
@@ -220,6 +225,7 @@ export async function buildCity({ scene, renderer }) {
     return g;
   })();
   const matTree = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
+  skinTree(matTree, skin);
   const inFootprint = (x, z, pad) => footprints.some(f => x > f.x0 - pad && x < f.x1 + pad && z > f.z0 - pad && z < f.z1 + pad);
   const addTree = (x, z, s) => {
     const ch = chunkOf(x, z); ch.trees.push([x, z, s, hash2(x * 7, z * 3)]);
@@ -244,6 +250,59 @@ export async function buildCity({ scene, renderer }) {
     });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
     im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); root.add(im); treeMeshes.push(im); ch.meshes.push(im);
+  }
+
+  // ---------------------------------------------------------------- props (Manhattan props.glb): street furniture + roof extras, merged per chunk (1 draw call)
+  const PG = skin ? await (async () => {
+    try {
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+      const gltf = await new GLTFLoader().loadAsync('/assets/city/props.glb'); gltf.scene.updateMatrixWorld(true);
+      const geos = {};
+      gltf.scene.traverse((o) => { if (!o.isMesh) return; const g = o.geometry.clone().toNonIndexed(); g.applyMatrix4(o.matrixWorld); geos[o.name] = g; });
+      return geos;
+    } catch (e) { console.warn('[citylite] props.glb unavailable', e); return null; }
+  })() : null;
+  if (PG) {
+    const rp = mulberry32(0xB0B5), put = (name, x, y, z, yaw, sc = 1) => { if (PG[name]) chunkOf(x, z).props.push([name, x, y, z, yaw, sc]); };
+    let subways = 0;
+    for (const ax of avenues) for (const sz of streets) for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const x = ax + sx * (AVH + 1.1), z = sz + sy * (STH + 1.1);
+      if (x < xMin - AVH || x > xMax + AVH || z < zMin - STH || z > zMax + STH) continue;
+      const r = rp();
+      if (r < 0.05 && subways < 8) { subways++; const yaw = sx > 0 ? 0 : Math.PI; put('subway', x + sx * 2.2, CH, z, yaw); solids.box(x + sx * 2.2 - 2.5, CH, z - 1, x + sx * 2.2 + 2.5, CH + 2.2, z + 1, 'equipment'); }
+      else if (r < 0.07) put('payphone', x, CH, z, rp() * 6.28);
+      else if (r < 0.6) put('signpole', x, CH, z, rp() * 6.28);
+    }
+    for (const B of blocks) {
+      if (B.kind === KINDS.KIND_PARK || rp() > 0.3) continue;
+      const x = B.x0 + 6 + rp() * (B.x1 - B.x0 - 12), z = B.z0 + 1.4;
+      put('dumpster', x, CH, z, 0); solids.box(x - 1, CH, z - 0.6, x + 1, CH + 1.3, z + 0.6, 'equipment');
+      if (rp() < 0.7) put('drum', x + 2.2, CH, z, rp() * 6.28);
+    }
+    for (const L of lots) { // roof extras on top of the tallest mass (decor only; the HVAC boxes keep the collision)
+      const r = rp(); if (r > 0.35) continue;
+      const mg = L.H > 55 ? 11 : 4; if (L.x1 - L.x0 < 2 * mg + 3 || L.z1 - L.z0 < 2 * mg + 3) continue;
+      put(r < 0.1 ? 'shed' : r < 0.22 ? 'vents' : 'dish', L.x0 + mg + rp() * (L.x1 - L.x0 - 2 * mg), L.H, L.z0 + mg + rp() * (L.z1 - L.z0 - 2 * mg), rp() * 6.28);
+    }
+    const matProp = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.1 });
+    const _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pn = new THREE.Matrix3(), _pv = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+    for (const ch of chunks.values()) {
+      if (!ch.props.length) continue;
+      const P = [], N = [], Cc = [];
+      for (const [name, x, y, z, yaw, sc] of ch.props) {
+        const g = PG[name], pa = g.attributes.position, na = g.attributes.normal, ca = g.attributes.color;
+        _pm.compose(_pv.set(x, y, z), _pq.setFromAxisAngle(UP, yaw), new THREE.Vector3(sc, sc, sc)); _pn.getNormalMatrix(_pm);
+        for (let i = 0; i < pa.count; i++) {
+          _pv.fromBufferAttribute(pa, i).applyMatrix4(_pm); P.push(_pv.x, _pv.y, _pv.z);
+          _pv.fromBufferAttribute(na, i).applyMatrix3(_pn).normalize(); N.push(_pv.x, _pv.y, _pv.z);
+          if (ca) Cc.push(ca.getX(i), ca.getY(i), ca.getZ(i)); else Cc.push(0.6, 0.6, 0.6);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(Cc, 3));
+      g.computeBoundingSphere();
+      const m = new THREE.Mesh(g, matProp); m.name = 'props-open-' + ch.cx + '_' + ch.cz; m.castShadow = true; m.receiveShadow = true; m.matrixAutoUpdate = false; root.add(m); ch.meshes.push(m);
+    }
   }
 
   // ---------------------------------------------------------------- chunk meshes
