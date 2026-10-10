@@ -10,6 +10,7 @@ import { G, avenues, streets, NCOL, NROW } from './openmap.js';
 
 const MAX_SCALE = 1.2, SPACING = 90;           // metres between cars per lane at density 1
 const ACC = 2.6, BRAKE = 4.5, GAP_MIN = 2.2;
+const STOP_BACK = 7.6;                          // m before the junction edge: the painted stop line sits ~7 m back (crosswalk 4 m + stop zone)
 const CYCLE = 20;                               // s: avenues green 0-8, yellow 8-9.2, all red -10, streets green 10-18, yellow 18-19.2, red -20
 const lightOf = (t, avenueAxis) => {
   const u = (t + (avenueAxis ? 0 : 10)) % CYCLE;
@@ -64,9 +65,9 @@ export function createOpenTraffic({ models, group, scale = 0.12, _V = null }) {
         target = Math.min(target, gap <= 0 ? 0 : Math.sqrt(2 * BRAKE * gap) * 0.9);
       }
       if (lt !== 0) { // the next stop line ahead
-        const front = c.s + c.len / 2, k = Math.max(0, Math.ceil((front - 1 - (ln.junc0 - ln.half - 1.5)) / ln.juncStep));
+        const front = c.s + c.len / 2, k = Math.max(0, Math.ceil((front - 1 - (ln.junc0 - ln.half - STOP_BACK)) / ln.juncStep));
         if (k <= ln.juncN) {
-          const sl = ln.junc0 + k * ln.juncStep - ln.half - 1.5, dist = sl - front;
+          const sl = ln.junc0 + k * ln.juncStep - ln.half - STOP_BACK, dist = sl - front;
           if (dist > -1 && dist < 90 && (lt === 2 || dist > c.v * c.v / 6 + 3)) target = Math.min(target, Math.sqrt(2 * BRAKE * Math.max(dist, 0)) * 0.9);
         }
       }

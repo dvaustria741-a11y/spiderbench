@@ -1,6 +1,6 @@
 // OWNER: perf / open map. Cheap Manhattan-asset "skin" for the Open City (citylite.js): the flat vertex-coloured materials keep
 // their palette and only gain surface DETAIL (luminance ratio tex / average-of-tex), so brightness / hue do not change.
-//   ground: asphalt / sidewalk / grass (public/assets/city/tex/*, shrunk to 512 px in /assets/city/open/ground.webp)
+//   ground: 12 low-res tiles (asphalt, road markings, sidewalk, grass, dirt, pavers, water, concrete) in /assets/city/open/ground_tiles.png
 //   roofs : gravel / membrane / concrete / patched (roof_col.png tiles, 256 px)
 //   trees : leaves.png grain on crowns and trunks
 // One array-texture fetch per pixel (ground, roofs) -> practically free on Low. ?noskin disables everything.
@@ -25,7 +25,8 @@ async function strip(name, layers) {
 export async function loadOpenSkin() {
   if (typeof document === 'undefined' || new URLSearchParams(location.search).has('noskin')) return null;
   try {
-    const [ground, roof, leafIm] = await Promise.all([strip('ground.webp', 3), strip('roof.webp', 4), loadImageRetry(BASE + 'leaf.webp')]);
+    const [ground, roof, leafIm] = await Promise.all([strip('ground_tiles.png', 12), strip('roof.webp', 4), loadImageRetry(BASE + 'leaf.webp')]);
+    ground.tex.colorSpace = THREE.SRGBColorSpace; ground.tex.anisotropy = 8; ground.tex.needsUpdate = true;
     const cv = document.createElement('canvas'); cv.width = leafIm.width; cv.height = leafIm.height;
     const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(leafIm, 0, 0);
     const d = cx.getImageData(0, 0, cv.width, cv.height).data; let s = 0, n = 0; for (let i = 0; i < d.length; i += 16) { s += lum(d, i); n++; }
@@ -34,29 +35,22 @@ export async function loadOpenSkin() {
   } catch (e) { console.warn('[citylite] open skin textures unavailable', e); return null; }
 }
 
-// ground: vertex uv.x carries the surface id (0 asphalt, 1 sidewalk, 2 grass, >= 3 none: kerb faces); planar world-xz mapping
+// ground: 12 hand-made tiles in a 128 px array texture (ground_tiles.png). Layer ids (vertex uv.x):
+//   0 asphalt, 1 double yellow, 2 dashed white, 3 zebra, 4 stop line, 5 sidewalk, 6 kerb strip, 7 grass, 8 dirt, 9 pavers, 10 water, 11 concrete, 99 = untextured (flat vertex colour)
+// The tile coordinates are baked per vertex into the vertex colour (r, g) by citylite.js, so every surface chooses its own scale / orientation.
 export function skinGround(mat, skin) {
   if (!skin) return;
-  const a = skin.ground.avg;
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uGT = { value: skin.ground.tex };
-    sh.uniforms.uGAvg = { value: new THREE.Vector3(a[0], a[1], a[2]) };
-    sh.uniforms.uGScale = { value: new THREE.Vector3(1 / 14, 1 / 6, 1 / 9) }; // texture repeats per metre: asphalt 14 m, sidewalk 6 m, grass 9 m
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vSurf; varying vec2 vGP;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurf = uv.x; vGP = (modelMatrix * vec4(transformed, 1.0)).xz;');
+      .replace('#include <common>', '#include <common>\nvarying float vSurf;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurf = uv.x;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform highp sampler2DArray uGT; uniform vec3 uGAvg; uniform vec3 uGScale; varying float vSurf; varying vec2 vGP;')
+      .replace('#include <common>', '#include <common>\nuniform highp sampler2DArray uGT; varying float vSurf;')
       .replace('#include <color_fragment>', `#include <color_fragment>
-  if (vSurf < 2.5) {
-    float li = floor(vSurf + 0.5);
-    float sc = li < 0.5 ? uGScale.x : (li < 1.5 ? uGScale.y : uGScale.z);
-    float av = li < 0.5 ? uGAvg.x : (li < 1.5 ? uGAvg.y : uGAvg.z);
-    vec3 gt = texture(uGT, vec3(vGP * sc, li)).rgb;
-    diffuseColor.rgb *= clamp(dot(gt, vec3(0.299, 0.587, 0.114)) / av, 0.5, 1.7);
-  }`);
+  if (vSurf < 50.0) diffuseColor.rgb = texture(uGT, vec3(vColor.xy, floor(vSurf + 0.5))).rgb;`);
   };
-  mat.customProgramCacheKey = () => 'openSkinGround';
+  mat.customProgramCacheKey = () => 'openSkinGround2';
 }
 
 // roofs: every upward-facing face of the facade / glass materials; one of 4 roof types per 48 m cell

@@ -108,62 +108,85 @@ export async function buildCity({ scene, renderer }) {
   };
 
   // ---------------------------------------------------------------- ground
-  const C = { road: col(0x2b2d31), walk: col(0x9c9b95), curb: col(0x74736f), plaza: col(0xb9b5a8), yard: col(0x8a8c85), lot: col(0x3b3c3f), grass: col(0x4d6a38), dirt: col(0x6b6a5c), yellow: col(0xd9b43a), white: col(0xe8e8e2) };
-  const flat = (gb, x0, z0, x1, z1, y, color, surf = 4) => gb.horiz(x0, z0, x1, z1, y, color, true, [surf, 0]); // uv.x = surface id for the ground skin (0 asphalt, 1 sidewalk, 2 grass, 4 none)
+  // Every ground quad samples one of 12 low-res tiles (ground_tiles.png, see openskin.js for the layer ids). The tile coordinates are
+  // baked per vertex (vertex colour r, g), so markings, crosswalks and stop lines are just quads with their own tile mapping.
+  // Without the skin (?noskin) the same quads fall back to flat colours.
+  const C = { road: col(0x2b2d31), walk: col(0x9c9b95), curb: col(0x74736f), plaza: col(0xb9b5a8), lot: col(0x8f8f8a), grass: col(0x4d6a38), dirt: col(0x7a6446) };
+  const TEX = !!skin;
+  const LY = { ASPH: 0, DBL: 1, DASH: 2, ZEB: 3, STOP: 4, WALK: 5, KERB: 6, GRASS: 7, DIRT: 8, PAVE: 9, WATER: 10, CONC: 11 };
+  const FB = [C.road, C.road, C.road, C.road, C.road, C.walk, C.curb, C.grass, C.dirt, C.plaza, C.road, C.lot];
+  const SC = [12, 3.6, 36, 10, 3.75, 6, 6, 12, 10, 6, 10, 10]; // metres per tile repeat for the tiling surfaces
+  const W = (sc) => (x, z) => [x / sc, z / sc];
+  // horizontal quad at height y; f(x, z) -> [u, v] in tile units
+  const texq = (gb, x0, z0, x1, z1, y, layer, f) => {
+    const P = [[x0, z1], [x1, z1], [x1, z0], [x0, z0]];
+    for (const k of [0, 1, 2, 0, 2, 3]) {
+      const [x, z] = P[k]; gb.p.push(x, y, z); gb.n.push(0, 1, 0);
+      if (TEX) { const t = f(x, z); gb.u.push(layer, 0); gb.c.push(t[0], t[1], 0); }
+      else { gb.u.push(99, 0); gb.c.push(FB[layer][0], FB[layer][1], FB[layer][2]); }
+    }
+  };
   const AVH = G.AV_HALF, STH = G.ST_HALF, CH = G.CURB_H;
   const xMin = avenues[0], xMax = avenues[NCOL], zMin = streets[0], zMax = streets[NROW];
-  // roads: per avenue row segments + intersections + street gaps; chunked by centre
-  const roadRect = (x0, z0, x1, z1) => flat(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd, x0, z0, x1, z1, 0, C.road, 0);
-  for (const ax of avenues) for (let k = 0; k <= NROW; k++) {
-    roadRect(ax - AVH, streets[k] - STH, ax + AVH, streets[k] + STH); // intersection
-    if (k < NROW) roadRect(ax - AVH, streets[k] + STH, ax + AVH, streets[k + 1] - STH);
+  const chunkG = (x0, z0, x1, z1) => chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd;
+  const tq = (x0, z0, x1, z1, layer, f) => texq(chunkG(x0, z0, x1, z1), x0, z0, x1, z1, 0, layer, f);
+  const asph = (x0, z0, x1, z1) => tq(x0, z0, x1, z1, LY.ASPH, W(SC[0]));
+  const ZB = 4, ZS = 3.75, MARK = ZB + ZS; // crosswalk depth, stop-line zone depth (stop line sits ~7 m before the junction edge)
+
+  // junctions: plain asphalt
+  for (const ax of avenues) for (let k = 0; k <= NROW; k++) asph(ax - AVH, streets[k] - STH, ax + AVH, streets[k] + STH);
+  // avenue segments (N-S): crosswalk | stop zone (approach half only) | markings strips | stop zone | crosswalk
+  for (const ax of avenues) for (let k = 0; k < NROW; k++) {
+    const z0 = streets[k] + STH, z1 = streets[k + 1] - STH, xa = ax - AVH, xb = ax + AVH;
+    for (const za of [z0, z1 - ZB]) tq(xa, za, xb, za + ZB, LY.ZEB, (x, z) => [(x - xa) / 10, (z - za) / ZB]);
+    // cars heading north use the east half and stop at the north end; cars heading south use the west half and stop at the south end
+    tq(ax, z0 + ZB, xb, z0 + MARK, LY.STOP, (x, z) => [(x - ax) / AVH, (z - (z0 + ZB)) / ZS]); asph(xa, z0 + ZB, ax, z0 + MARK);
+    tq(xa, z1 - MARK, ax, z1 - ZB, LY.STOP, (x, z) => [(x - xa) / AVH, ((z1 - ZB) - z) / ZS]); asph(ax, z1 - MARK, xb, z1 - ZB);
+    const za = z0 + MARK, zb = z1 - MARK;
+    asph(xa, za, xa + 1, zb); asph(xb - 1, za, xb, zb);
+    for (const off of [-7.2, -3.6, 3.6, 7.2]) tq(ax + off - 1.8, za, ax + off + 1.8, zb, LY.DASH, (x, z) => [(x - (ax + off - 1.8)) / 3.6, (z - za) / 36]);
+    tq(ax - 1.8, za, ax + 1.8, zb, LY.DBL, (x, z) => [(x - (ax - 1.8)) / 3.6, z / 3.6]);
   }
-  for (const sz of streets) for (let i = 0; i < NCOL; i++) roadRect(avenues[i] + AVH, sz - STH, avenues[i + 1] - AVH, sz + STH);
-  { // the middle street leaves the map east and west (long road to the horizon)
+  // street segments (E-W): same idea, rotated; double yellow centre, no lane dashes (12 m wide)
+  for (const sz of streets) for (let i = 0; i < NCOL; i++) {
+    const x0 = avenues[i] + AVH, x1 = avenues[i + 1] - AVH, za = sz - STH, zb = sz + STH;
+    for (const xs of [x0, x1 - ZB]) tq(xs, za, xs + ZB, zb, LY.ZEB, (x, z) => [(z - za) / 12, (x - xs) / ZB]);
+    // cars heading west use the north half and stop at the west end; cars heading east use the south half and stop at the east end
+    tq(x0 + ZB, za, x0 + MARK, sz, LY.STOP, (x, z) => [(z - za) / STH, (x - (x0 + ZB)) / ZS]); asph(x0 + ZB, sz, x0 + MARK, zb);
+    tq(x1 - MARK, sz, x1 - ZB, zb, LY.STOP, (x, z) => [(z - sz) / STH, ((x1 - ZB) - x) / ZS]); asph(x1 - MARK, za, x1 - ZB, sz);
+    const xa = x0 + MARK, xb = x1 - MARK;
+    asph(xa, za, xb, sz - 1.8); asph(xa, sz + 1.8, xb, zb);
+    tq(xa, sz - 1.8, xb, sz + 1.8, LY.DBL, (x, z) => [(z - (sz - 1.8)) / 3.6, x / 3.6]);
+  }
+  { // the middle street leaves the map east and west (long plain road to the horizon)
     const zc = streets[NROW / 2];
-    for (const [a, b] of [[xMin - AVH - 1500, xMin - AVH], [xMax + AVH, xMax + AVH + 1500]]) for (let x = a; x < b; x += 300) roadRect(x, zc - STH, Math.min(b, x + 300), zc + STH);
+    for (const [a, b] of [[xMin - AVH - 1500, xMin - AVH], [xMax + AVH, xMax + AVH + 1500]]) for (let x = a; x < b; x += 300) asph(x, zc - STH, Math.min(b, x + 300), zc + STH);
   }
   // blocks: sidewalk ring (4 rects, no overlap with the inner surface) raised by the kerb, then the inner property surface.
   // Nothing is stacked on top of anything coplanar-ish: stacked layers a few cm apart z-fight at distance (the 150 km far plane
   // leaves almost no depth precision), which showed the grass through the roads.
   for (const B of blocks) {
     const gb = chunkOf(B.cx, B.cz).gnd, kind = B.kind;
-    flat(gb, B.x0, B.z0, B.x1, B.pz0, CH, C.walk, 1); flat(gb, B.x0, B.pz1, B.x1, B.z1, CH, C.walk, 1);
-    flat(gb, B.x0, B.pz0, B.px0, B.pz1, CH, C.walk, 1); flat(gb, B.px1, B.pz0, B.x1, B.pz1, CH, C.walk, 1);
+    const wk = (x0, z0, x1, z1) => texq(gb, x0, z0, x1, z1, CH, LY.WALK, W(SC[LY.WALK]));
+    wk(B.x0, B.z0, B.x1, B.pz0); wk(B.x0, B.pz1, B.x1, B.z1); wk(B.x0, B.pz0, B.px0, B.pz1); wk(B.px1, B.pz0, B.x1, B.pz1);
     for (const [ax, az, bx, bz, n] of [[B.x0, B.z1, B.x1, B.z1, [0, 0, -1]], [B.x1, B.z0, B.x0, B.z0, [0, 0, 1]], [B.x0, B.z0, B.x0, B.z1, [1, 0, 0]], [B.x1, B.z1, B.x1, B.z0, [-1, 0, 0]]]) {
-      gb.quad([ax, 0, az], [bx, 0, bz], [bx, CH, bz], [ax, CH, az], [-n[0], 0, -n[2]], [[4, 0], [4, 0], [4, 0], [4, 0]], C.curb); // kerb face
+      gb.quad([ax, 0, az], [bx, 0, bz], [bx, CH, bz], [ax, CH, az], [-n[0], 0, -n[2]], [[99, 0], [99, 0], [99, 0], [99, 0]], C.curb); // kerb face (flat colour)
     }
     const iy = kind === KINDS.KIND_PARK ? CH + 0.02 : CH;
-    const ic = kind === KINDS.KIND_PARK ? C.grass : kind === KINDS.KIND_PLAZA ? C.plaza : kind === KINDS.KIND_LOT ? C.lot : (B.h < 0.45 ? C.yard : C.dirt);
-    flat(gb, B.px0, B.pz0, B.px1, B.pz1, iy, ic, kind === KINDS.KIND_PARK || (kind !== KINDS.KIND_PLAZA && kind !== KINDS.KIND_LOT && B.h >= 0.45) ? 2 : kind === KINDS.KIND_LOT ? 0 : 1);
-  }
-  // road paint: avenue centre (double yellow) + dashed lane lines, street centre dashes, zebra crossings
-  const pq = (x0, z0, x1, z1, color) => flat(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).pnt, x0, z0, x1, z1, 0.03, color);
-  for (const ax of avenues) for (let k = 0; k < NROW; k++) {
-    const za = streets[k] + STH + 4, zb = streets[k + 1] - STH - 4;
-    pq(ax - 0.28, za, ax - 0.1, zb, C.yellow); pq(ax + 0.1, za, ax + 0.28, zb, C.yellow);
-    for (const off of [-AVH * 0.36, AVH * 0.36, -AVH * 0.72, AVH * 0.72]) for (let z = za; z < zb - 3; z += 9) pq(ax + off - 0.08, z, ax + off + 0.08, z + 4, C.white);
-  }
-  for (const sz of streets) for (let i = 0; i < NCOL; i++) {
-    const xa = avenues[i] + AVH + 4, xb = avenues[i + 1] - AVH - 4;
-    for (let x = xa; x < xb - 3; x += 9) pq(x, sz - 0.1, x + 4, sz + 0.1, C.yellow);
-  }
-  for (const ax of avenues) for (const sz of streets) { // zebra crossings on the four sides of every junction
-    for (let s = -AVH + 1; s < AVH - 0.5; s += 1.8) { pq(ax + s, sz - STH - 4, ax + s + 0.9, sz - STH - 1.8, C.white); pq(ax + s, sz + STH + 1.8, ax + s + 0.9, sz + STH + 4, C.white); }
-    for (let s = -STH + 0.8; s < STH - 0.5; s += 1.8) { pq(ax - AVH - 4, sz + s, ax - AVH - 1.8, sz + s + 0.9, C.white); pq(ax + AVH + 1.8, sz + s, ax + AVH + 4, sz + s + 0.9, C.white); }
+    const layer = kind === KINDS.KIND_PARK ? LY.GRASS : kind === KINDS.KIND_PLAZA ? LY.PAVE : kind === KINDS.KIND_LOT ? LY.CONC : (B.h < 0.45 ? LY.GRASS : LY.DIRT);
+    texq(gb, B.px0, B.pz0, B.px1, B.pz1, iy, layer, W(SC[layer]));
   }
   // wide outskirts: a ring AROUND the grid (never under it) so no two ground layers overlap
-  { const big = new GB(), R = 9000, g = col(0x56653f), Y = -0.35, zc = streets[NROW / 2];
+  { const big = new GB(), R = 9000, Y = -0.35, zc = streets[NROW / 2], gf = W(SC[LY.GRASS]);
     const x0 = xMin - AVH, x1 = xMax + AVH, z0 = zMin - STH, z1 = zMax + STH;
-    const GU = [2, 0];
-    big.horiz(x0, -R, x1, z0, Y, g, true, GU); big.horiz(x0, z1, x1, R, Y, g, true, GU); // north / south
-    for (const [a, b] of [[-R, x0], [x1, R]]) { big.horiz(a, -R, b, zc - STH, Y, g, true, GU); big.horiz(a, zc + STH, b, R, Y, g, true, GU); } // west / east, with a gap for the road
+    texq(big, x0, -R, x1, z0, Y, LY.GRASS, gf); texq(big, x0, z1, x1, R, Y, LY.GRASS, gf); // north / south
+    for (const [a, b] of [[-R, x0], [x1, R]]) { texq(big, a, -R, b, zc - STH, Y, LY.GRASS, gf); texq(big, a, zc + STH, b, R, Y, LY.GRASS, gf); } // west / east, with a gap for the road
     const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m); }
 
   // ---------------------------------------------------------------- buildings
   const solids = new Solids(), zips = new ZipPoints();
   const boxes = [], footprints = [];
-  const lots = generateLots();
+  const lots = new URLSearchParams(location.search).has('buildings') ? generateLots() : []; // buildings are off while the ground is reworked (?buildings brings them back)
   const WALL = [0xd8cfc0, 0xc9b9a6, 0xb5a191, 0xa9a9a2, 0xd6d0c6, 0x9a8f86, 0xc4c8c8, 0xb08c78, 0x8f9aa3].map(col);
   const GLASS = [0x6f8aa3, 0x5d7f96, 0x7d94a6, 0x4f6b82].map(col);
   const ROOF = col(0x5d5b58), HV = col(0x8d8f90), BASE = col(0x565551);
