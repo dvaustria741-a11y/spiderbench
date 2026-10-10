@@ -43,14 +43,22 @@ export function skinGround(mat, skin) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uGT = { value: skin.ground.tex };
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vSurf;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurf = uv.x;');
+      .replace('#include <common>', '#include <common>\nvarying float vSurf; varying float vUpN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurf = uv.x; vUpN = normal.y;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform highp sampler2DArray uGT; varying float vSurf;')
+      .replace('#include <common>', '#include <common>\nuniform highp sampler2DArray uGT; varying float vSurf; varying float vUpN;')
       .replace('#include <color_fragment>', `#include <color_fragment>
-  if (vSurf < 50.0) diffuseColor.rgb = texture(uGT, vec3(vColor.xy, floor(vSurf + 0.5))).rgb;`);
+  if (vSurf < 50.0) {
+    float L = floor(vSurf + 0.5);
+    vec3 tc = texture(uGT, vec3(vColor.xy, L)).rgb;
+    if (L > 6.5 && L < 7.5) { // grass: steep slopes of the park mounds wear through to dirt
+      float sl = smoothstep(0.995, 0.96, vUpN);
+      if (sl > 0.0) tc = mix(tc, texture(uGT, vec3(vColor.xy * 0.83 + 0.31, 8.0)).rgb, sl);
+    }
+    diffuseColor.rgb = tc;
+  }`);
   };
-  mat.customProgramCacheKey = () => 'openSkinGround2';
+  mat.customProgramCacheKey = () => 'openSkinGround3';
 }
 
 // roofs: every upward-facing face of the facade / glass materials; one of 4 roof types per 48 m cell

@@ -215,6 +215,47 @@ export async function buildCity({ scene, renderer }) {
   meshLayer('lot', LY.CONC, CH);
   meshLayer('plaza', LY.PAVE, CH);
   meshLayer('park', LY.GRASS, CH + 0.02);
+  // ---- rolling park ground (Spider Fuser style mounds): a raster-aligned heightfield over the park cells, always >= the flat park layer, fading
+  // to flat toward the park edge so it meets the sidewalk. The same heights drive collision (terrainHeight) and where the trees stand.
+  const PARK_Y = CH + 0.02, HILL_LIFT = 0.03, HILL_A = 6.0, HILL_FADE = 18;
+  const vnoise = (x, z) => {
+    const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz, sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+    const a = hash2(ix, iz), b = hash2(ix + 1, iz), c = hash2(ix, iz + 1), d = hash2(ix + 1, iz + 1);
+    return (a + (b - a) * sx) * (1 - sz) + (c + (d - c) * sx) * sz;
+  };
+  const hillRaw = (x, z) => 0.40 * vnoise(x / 30 + 3.1, z / 30 + 7.7) + 0.35 * vnoise(x / 14 + 11.3, z / 14 + 2.9) + 0.25 * vnoise(x / 7 + 5.5, z / 7 + 13.1);
+  const HILLW = NX + 1, HILLV = new Float32Array(HILLW * (NZ + 1));
+  { // distance (m) from every park cell to the nearest non-park cell: two-pass chamfer
+    const D = new Float32Array(NX * NZ), BIG = 1e6, d1 = CELL, d2 = CELL * Math.SQRT2;
+    for (let k = 0; k < D.length; k++) D[k] = GRID[k] === CLS.PARK ? BIG : 0;
+    const at = (i, j) => (i < 0 || j < 0 || i >= NX || j >= NZ ? 0 : D[j * NX + i]);
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const k = j * NX + i; if (!D[k]) continue; D[k] = Math.min(D[k], at(i - 1, j) + d1, at(i, j - 1) + d1, at(i - 1, j - 1) + d2, at(i + 1, j - 1) + d2); }
+    for (let j = NZ - 1; j >= 0; j--) for (let i = NX - 1; i >= 0; i--) { const k = j * NX + i; if (!D[k]) continue; D[k] = Math.min(D[k], at(i + 1, j) + d1, at(i, j + 1) + d1, at(i + 1, j + 1) + d2, at(i - 1, j + 1) + d2); }
+    for (let j = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++) {
+      const c4 = [at(i - 1, j - 1), at(i, j - 1), at(i - 1, j), at(i, j)]; // corner heights: only corners that touch park cells, faded by the nearest non-park cell
+      if (!(c4[0] || c4[1] || c4[2] || c4[3])) continue;
+      const dm = Math.min(...c4), f = Math.min(1, dm / HILL_FADE), fs = f * f * (3 - 2 * f);
+      HILLV[j * HILLW + i] = HILL_A * fs * Math.max(0, hillRaw(X0 + i * CELL, Z0 + j * CELL) - 0.2);
+    }
+  }
+  const hillAt = (x, z) => { // bilinear over the corner heights
+    const u = (x - X0) / CELL, v = (z - Z0) / CELL, i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j;
+    if (i < 0 || j < 0 || i >= NX || j >= NZ) return 0;
+    const k = j * HILLW + i; return (HILLV[k] * (1 - fu) + HILLV[k + 1] * fu) * (1 - fv) + (HILLV[k + HILLW] * (1 - fu) + HILLV[k + HILLW + 1] * fu) * fv;
+  };
+  const parkTop = (x, z) => PARK_Y + HILL_LIFT + hillAt(x, z);
+  { const gb = new GB(), f = W(14), hv = (i, j) => HILLV[Math.max(0, Math.min(NZ, j)) * HILLW + Math.max(0, Math.min(NX, i))];
+    const vtx = (i, j) => {
+      const x = X0 + i * CELL, z = Z0 + j * CELL, nx = -(hv(i + 1, j) - hv(i - 1, j)) / (2 * CELL), nz = -(hv(i, j + 1) - hv(i, j - 1)) / (2 * CELL), q = Math.hypot(nx, 1, nz);
+      gb.p.push(x, PARK_Y + HILL_LIFT + hv(i, j), z); gb.n.push(nx / q, 1 / q, nz / q);
+      if (TEX) { const t = f(x, z); gb.u.push(LY.GRASS, 0); gb.c.push(t[0], t[1], 0); } else { gb.u.push(99, 0); gb.c.push(C.grass[0], C.grass[1], C.grass[2]); }
+    };
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+      if (GRID[j * NX + i] !== CLS.PARK) continue;
+      for (const k of [[i, j + 1], [i + 1, j + 1], [i + 1, j], [i, j + 1], [i + 1, j], [i, j]]) vtx(k[0], k[1]);
+    }
+    if (!gb.empty) { const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = 'park-hills'; root.add(m); }
+  }
   // vertical walls along smooth polylines (outside on the right of travel): kerbs between road and block, sea wall between land and water
   // run > 0 turns the vertical wall into a slope: the top edge stays on the land edge (y1), the bottom edge sits `run` metres out into the water (y0)
   const wallLines = (key, y0, y1, layer, sc, run = 0) => {
@@ -338,8 +379,9 @@ export async function buildCity({ scene, renderer }) {
   skinTree(matTree, skin);
   const inFootprint = (x, z, pad) => footprints.some(f => x > f.x0 - pad && x < f.x1 + pad && z > f.z0 - pad && z < f.z1 + pad);
   const addTree = (x, z, s) => {
-    const ch = chunkOf(x, z); ch.trees.push([x, z, s, hash2(x * 7, z * 3)]);
-    solids.cyl(x, z, 0, 3.4 * s, 0.3 * s, 0.3 * s, 'trunk');
+    const ty = cellAt(x, z) === CLS.PARK ? parkTop(x, z) - 0.1 : 0; // park trees stand on the hills
+    const ch = chunkOf(x, z); ch.trees.push([x, z, s, hash2(x * 7, z * 3), ty]);
+    solids.cyl(x, z, ty, ty + 3.4 * s, 0.3 * s, 0.3 * s, 'trunk');
   };
   { const rnd = mulberry32(0x7EE);
     for (const P of PARKS) for (let x = P[0] + 8; x < P[2] - 6; x += 15) for (let z = P[1] + 8; z < P[3] - 6; z += 15) if (rnd() < 0.75) addTree(x + (rnd() - 0.5) * 9, z + (rnd() - 0.5) * 9, 0.8 + rnd() * 0.7);
@@ -354,8 +396,8 @@ export async function buildCity({ scene, renderer }) {
   for (const ch of chunks.values()) {
     const n = ch.trees.length; if (!n) continue;
     const im = new THREE.InstancedMesh(treeGeo, matTree, n); im.name = 'trees-open-' + ch.cx + '_' + ch.cz;
-    ch.trees.forEach(([x, z, s, h], i) => {
-      _q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), h * 6.28); _s.set(s, s * (0.9 + h * 0.3), s); _p.set(x, 0, z);
+    ch.trees.forEach(([x, z, s, h, ty], i) => {
+      _q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), h * 6.28); _s.set(s, s * (0.9 + h * 0.3), s); _p.set(x, ty, z);
       im.setMatrixAt(i, _m.compose(_p, _q, _s)); im.setColorAt(i, _c.setRGB(0.85 + h * 0.3, 0.9 + (h * 7 % 1) * 0.2, 0.85 + h * 0.2));
     });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
@@ -452,7 +494,7 @@ export async function buildCity({ scene, renderer }) {
     const c = cellAt(x, z);
     if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; if (Math.abs(x) >= 2600) return SEABED; const dz = Math.abs(z - e.z) - e.half; return dz < 0 ? 0 : slopeH(0, dz); }
     if (c >= CLS.AV && c <= CLS.INT) return 0;
-    if (c !== CLS.OUT) return c === CLS.PARK ? CH + 0.02 : CH;
+    if (c !== CLS.OUT) return c === CLS.PARK ? parkTop(x, z) : CH;
     return slopeH(CH, seaDist(x, z));
   };
   const grid = new CollisionGrid(solids, 24);
