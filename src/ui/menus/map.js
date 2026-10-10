@@ -283,13 +283,13 @@ export function createMapPage(sys) {
         g.save(); g.beginPath(); g.rect(x0, y0, x1 - x0, y1 - y0); g.clip();
         // locked: the city is still drawn, but desaturated, darkened and covered in drifting red static
         g.globalAlpha = 1 - k;
-        g.globalCompositeOperation = 'saturation'; g.fillStyle = '#808080'; g.fillRect(x0, y0, x1 - x0, y1 - y0);
-        g.globalCompositeOperation = 'source-over'; g.fillStyle = 'rgba(6,10,26,.42)'; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+        if (!globalThis.__LITE_R) { g.globalCompositeOperation = 'saturation'; g.fillStyle = '#808080'; g.fillRect(x0, y0, x1 - x0, y1 - y0); } // (perf) the blend modes are very slow on phone GPUs
+        g.globalCompositeOperation = 'source-over'; g.fillStyle = globalThis.__LITE_R ? 'rgba(6,10,26,.55)' : 'rgba(6,10,26,.42)'; g.fillRect(x0, y0, x1 - x0, y1 - y0);
         const off = (time * 9) % 48; g.translate(off, 0); g.fillStyle = pattern; g.fillRect(x0 - 48 - off, y0, x1 - x0 + 96, y1 - y0); g.translate(-off, 0);
         // signal glitch: blocks of the district flicker / shear sideways (deterministic per 0.12 s tick)
         let sd = Math.floor(time * 8) * 131 + d.id.charCodeAt(0) * 7; const rn = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
         g.globalAlpha = 1 - k;
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < (globalThis.__LITE_R ? 2 : 10); i++) { // (perf) lite: 2 glitch slices, not 10 big-canvas copies per district
           const gy = y0 + rn() * (y1 - y0), gh = (4 + rn() * 22) * dpr, sh = (rn() - 0.5) * 40 * dpr;
           if (base && rn() < 0.6) { const [bsx, bsy] = toS(bx0, bz0), sc = view.s * dpr / PXM, src = baseMips?.[0] || base;
             g.drawImage(src, (x0 - bsx) / sc, (gy - bsy) / sc, (x1 - x0) / sc, gh / sc, x0 + sh, gy, x1 - x0, gh); }
@@ -489,7 +489,7 @@ export function createMapPage(sys) {
       if (held.has('KeyA') || held.has('ArrowLeft')) view.x -= sp; if (held.has('KeyD') || held.has('ArrowRight')) view.x += sp;
       if (held.size) clampView();
       travel.update(0);
-      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > 0.25) { drawAcc = 0; dirty = false; const t0 = performance.now(); draw(); window.__mapMs = performance.now() - t0; } // 10 Hz idle redraw (the canvas was fully repainted every frame)
+      drawAcc += dt; if (dirty || held.size || drag || revealAnim || drawAcc > (globalThis.__LITE_R ? 0.5 : 0.25)) { drawAcc = 0; dirty = false; const t0 = performance.now(); draw(); window.__mapMs = performance.now() - t0; } // 10 Hz idle redraw (the canvas was fully repainted every frame)
       if (pulse > 0.25) { pulse = 0; updateLegend(); }
     },
   };

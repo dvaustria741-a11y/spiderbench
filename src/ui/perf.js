@@ -6,7 +6,7 @@ export function initPerf(ctx) {
   // BENCH button: runs the same view with parts of the game switched off, one at a time, and prints the average frame
   // time of each. Whatever removes the most time is the bottleneck (CPU sim, city drawing, post-processing, UI, resolution).
   const btn = document.createElement('button'); btn.textContent = 'BENCH';
-  btn.style.cssText = 'position:fixed;left:calc(8px + env(safe-area-inset-left));bottom:calc(150px + env(safe-area-inset-bottom));z-index:81;display:none;padding:8px 16px;border:2px solid #9f9;border-radius:8px;background:rgba(0,0,0,.75);color:#9f9;font:700 14px monospace;touch-action:manipulation';
+  btn.style.cssText = 'position:fixed;left:calc(96px + env(safe-area-inset-left));top:calc(8px + env(safe-area-inset-top));z-index:81;display:none;padding:8px 16px;border:2px solid #9f9;border-radius:8px;background:rgba(0,0,0,.75);color:#9f9;font:700 14px monospace;touch-action:manipulation';
   document.body.appendChild(btn);
   const frames = n => new Promise(res => { let i = 0; const t0 = performance.now(); const step = () => { if (++i >= n) res((performance.now() - t0) / n); else requestAnimationFrame(step); }; requestAnimationFrame(step); });
   let busy = false;
