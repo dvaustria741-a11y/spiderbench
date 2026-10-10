@@ -26,13 +26,13 @@ const CLASSIC_DISTRICTS = [
     lmDesc: 'Amateur Night has launched a thousand careers. The marquee still lights up the street.', photoHint: 'Brownstone stoops and a marquee that lights up the whole block.' },
 ];
 
-// Open map (3 x 3 regions over x -1400..1400, z -850..850); same ids / landmark names so saves stay compatible
+// Open map (3 x 3 regions over the layout image's land, x -900..700, z -550..490); same ids / landmark names so saves stay compatible
 const R = (x0, x1, z0, z1) => ({ x0, x1, z0, z1 });
 const OPEN_DISTRICTS = CLASSIC_DISTRICTS.map((d, k) => {
   const col = [0, 1, 2, 0, 1, 2, 0, 1, 2][k], row = [0, 0, 0, 1, 1, 1, 2, 2, 2][k];
-  const xs = [-2000, -470, 470, 2000], zs = [-1500, -283, 283, 1500];
+  const xs = [-2000, -370, 160, 2000], zs = [-1500, -200, 150, 1500];
   const rect = R(xs[col], xs[col + 1], zs[row], zs[row + 1]);
-  return { ...d, rect, anchor: [(Math.max(xs[col], -1300) + Math.min(xs[col + 1], 1300)) / 2, (Math.max(zs[row], -800) + Math.min(zs[row + 1], 800)) / 2] };
+  return { ...d, rect, anchor: [(Math.max(xs[col], -880) + Math.min(xs[col + 1], 690)) / 2, (Math.max(zs[row], -530) + Math.min(zs[row + 1], 470)) / 2] };
 });
 export const DISTRICTS = MAP === 'open' ? OPEN_DISTRICTS : CLASSIC_DISTRICTS;
 

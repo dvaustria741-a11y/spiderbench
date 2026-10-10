@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { createOpenTraffic } from './opentraffic.js';
 import { loadOpenSkin, skinGround, skinRoof, skinTree } from './openskin.js';
 import { loadVehicleModels } from './vehicles.js';
-import { G, avenues, streets, blocks, generateLots, streetsAt, hash2, mulberry32, KINDS, NCOL, NROW, inPark } from './openmap.js';
+import { G, avenues, streets, blocks, generateLots, streetsAt, hash2, mulberry32, KINDS, inPark, GRID, RASTER, CLS, cellAt, PARKS, EXITS, SPAWN } from './openmap.js';
 import { Solids, CollisionGrid, makeQueries, collisionDebugLines } from './collision.js';
 import { ZipPoints, createGeoDebug } from './zippoints.js';
 import { attachLife } from './npc/life.js';
@@ -97,7 +97,7 @@ export async function buildCity({ scene, renderer }) {
   const matGround = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
   const matPaint = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 
-  skinGround(matGround, skin); skinRoof(matFacade, skin); skinRoof(matGlass, skin);
+  skinGround(matGround, skin); skinGround(matPaint, skin); skinRoof(matFacade, skin); skinRoof(matGlass, skin);
 
   // chunk store: one set of builders per 400 m cell
   const chunks = new Map();
@@ -126,62 +126,105 @@ export async function buildCity({ scene, renderer }) {
       else { gb.u.push(99, 0); gb.c.push(FB[layer][0], FB[layer][1], FB[layer][2]); }
     }
   };
-  const AVH = G.AV_HALF, STH = G.ST_HALF, CH = G.CURB_H;
-  const xMin = avenues[0], xMax = avenues[NCOL], zMin = streets[0], zMax = streets[NROW];
-  const chunkG = (x0, z0, x1, z1) => chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd;
-  const tq = (x0, z0, x1, z1, layer, f) => texq(chunkG(x0, z0, x1, z1), x0, z0, x1, z1, 0, layer, f);
-  const asph = (x0, z0, x1, z1) => tq(x0, z0, x1, z1, LY.ASPH, W(SC[0]));
-  const ZB = 4, ZS = 3.75, MARK = ZB + ZS; // crosswalk depth, stop-line zone depth (stop line sits ~7 m before the junction edge)
-
-  // junctions: plain asphalt
-  for (const ax of avenues) for (let k = 0; k <= NROW; k++) asph(ax - AVH, streets[k] - STH, ax + AVH, streets[k] + STH);
-  // avenue segments (N-S): crosswalk | stop zone (approach half only) | markings strips | stop zone | crosswalk
-  for (const ax of avenues) for (let k = 0; k < NROW; k++) {
-    const z0 = streets[k] + STH, z1 = streets[k + 1] - STH, xa = ax - AVH, xb = ax + AVH;
-    for (const za of [z0, z1 - ZB]) tq(xa, za, xb, za + ZB, LY.ZEB, (x, z) => [(x - xa) / 10, (z - za) / ZB]);
-    // cars heading north use the east half and stop at the north end; cars heading south use the west half and stop at the south end
-    tq(ax, z0 + ZB, xb, z0 + MARK, LY.STOP, (x, z) => [(x - ax) / AVH, (z - (z0 + ZB)) / ZS]); asph(xa, z0 + ZB, ax, z0 + MARK);
-    tq(xa, z1 - MARK, ax, z1 - ZB, LY.STOP, (x, z) => [(x - xa) / AVH, ((z1 - ZB) - z) / ZS]); asph(ax, z1 - MARK, xb, z1 - ZB);
-    const za = z0 + MARK, zb = z1 - MARK;
-    asph(xa, za, xa + 1, zb); asph(xb - 1, za, xb, zb);
-    for (const off of [-7.2, -3.6, 3.6, 7.2]) tq(ax + off - 1.8, za, ax + off + 1.8, zb, LY.DASH, (x, z) => [(x - (ax + off - 1.8)) / 3.6, (z - za) / 36]);
-    tq(ax - 1.8, za, ax + 1.8, zb, LY.DBL, (x, z) => [(x - (ax - 1.8)) / 3.6, z / 3.6]);
-  }
-  // street segments (E-W): same idea, rotated; double yellow centre, no lane dashes (12 m wide)
-  for (const sz of streets) for (let i = 0; i < NCOL; i++) {
-    const x0 = avenues[i] + AVH, x1 = avenues[i + 1] - AVH, za = sz - STH, zb = sz + STH;
-    for (const xs of [x0, x1 - ZB]) tq(xs, za, xs + ZB, zb, LY.ZEB, (x, z) => [(z - za) / 12, (x - xs) / ZB]);
-    // cars heading west use the north half and stop at the west end; cars heading east use the south half and stop at the east end
-    tq(x0 + ZB, za, x0 + MARK, sz, LY.STOP, (x, z) => [(z - za) / STH, (x - (x0 + ZB)) / ZS]); asph(x0 + ZB, sz, x0 + MARK, zb);
-    tq(x1 - MARK, sz, x1 - ZB, zb, LY.STOP, (x, z) => [(z - sz) / STH, ((x1 - ZB) - x) / ZS]); asph(x1 - MARK, za, x1 - ZB, sz);
-    const xa = x0 + MARK, xb = x1 - MARK;
-    asph(xa, za, xb, sz - 1.8); asph(xa, sz + 1.8, xb, zb);
-    tq(xa, sz - 1.8, xb, sz + 1.8, LY.DBL, (x, z) => [(z - (sz - 1.8)) / 3.6, x / 3.6]);
-  }
-  { // the middle street leaves the map east and west (long plain road to the horizon)
-    const zc = streets[NROW / 2];
-    for (const [a, b] of [[xMin - AVH - 1500, xMin - AVH], [xMax + AVH, xMax + AVH + 1500]]) for (let x = a; x < b; x += 300) asph(x, zc - STH, Math.min(b, x + 300), zc + STH);
-  }
-  // blocks: sidewalk ring (4 rects, no overlap with the inner surface) raised by the kerb, then the inner property surface.
-  // Nothing is stacked on top of anything coplanar-ish: stacked layers a few cm apart z-fight at distance (the 150 km far plane
-  // leaves almost no depth precision), which showed the grass through the roads.
-  for (const B of blocks) {
-    const gb = chunkOf(B.cx, B.cz).gnd, kind = B.kind;
-    const wk = (x0, z0, x1, z1) => texq(gb, x0, z0, x1, z1, CH, LY.WALK, W(SC[LY.WALK]));
-    wk(B.x0, B.z0, B.x1, B.pz0); wk(B.x0, B.pz1, B.x1, B.z1); wk(B.x0, B.pz0, B.px0, B.pz1); wk(B.px1, B.pz0, B.x1, B.pz1);
-    for (const [ax, az, bx, bz, n] of [[B.x0, B.z1, B.x1, B.z1, [0, 0, -1]], [B.x1, B.z0, B.x0, B.z0, [0, 0, 1]], [B.x0, B.z0, B.x0, B.z1, [1, 0, 0]], [B.x1, B.z1, B.x1, B.z0, [-1, 0, 0]]]) {
-      gb.quad([ax, 0, az], [bx, 0, bz], [bx, CH, bz], [ax, CH, az], [-n[0], 0, -n[2]], [[99, 0], [99, 0], [99, 0], [99, 0]], C.curb); // kerb face (flat colour)
+  const CH = G.CURB_H, { CELL, NX, NZ, X0, Z0 } = RASTER, PAINT_Y = 0.02;
+  const isRoad = (c) => c >= CLS.AV && c <= CLS.INT, isRaised = (c) => c >= CLS.WALK;
+  const gc = (i, j) => (i < 0 || j < 0 || i >= NX || j >= NZ ? 0 : GRID[j * NX + i]);
+  // greedy rectangles (cell units) of every cell matching pred: rows are merged downwards while the run stays identical
+  const rectsOf = (pred) => {
+    const out = []; let prev = new Map();
+    for (let j = 0; j < NZ; j++) {
+      const cur = new Map();
+      for (let i = 0; i < NX;) {
+        if (!pred(GRID[j * NX + i])) { i++; continue; }
+        let k = i; while (k < NX && pred(GRID[j * NX + k])) k++;
+        const key = i * 4096 + k, r = prev.get(key);
+        if (r) { r[3] = j + 1; cur.set(key, r); } else { const nr = [i, j, k, j + 1]; cur.set(key, nr); out.push(nr); }
+        i = k;
+      }
+      prev = cur;
     }
-    const iy = kind === KINDS.KIND_PARK ? CH + 0.02 : CH;
-    const layer = kind === KINDS.KIND_PARK ? LY.GRASS : kind === KINDS.KIND_PLAZA ? LY.PAVE : kind === KINDS.KIND_LOT ? LY.CONC : (B.h < 0.45 ? LY.GRASS : LY.DIRT);
-    texq(gb, B.px0, B.pz0, B.px1, B.pz1, iy, layer, W(SC[layer]));
+    return out;
+  };
+  const toW = (r) => [X0 + r[0] * CELL, Z0 + r[1] * CELL, X0 + r[2] * CELL, Z0 + r[3] * CELL];
+  // every quad is split on the chunk grid so Draw Distance culls it with the chunk it really lies in
+  const splitChunks = (x0, z0, x1, z1, fn) => {
+    for (let a = Math.floor(x0 / CHUNK); a <= Math.floor((x1 - 1e-6) / CHUNK); a++) for (let b = Math.floor(z0 / CHUNK); b <= Math.floor((z1 - 1e-6) / CHUNK); b++)
+      fn(Math.max(x0, a * CHUNK), Math.max(z0, b * CHUNK), Math.min(x1, (a + 1) * CHUNK), Math.min(z1, (b + 1) * CHUNK));
+  };
+  const flat = (pred, layer, y) => {
+    for (const r of rectsOf(pred)) { const [x0, z0, x1, z1] = toW(r); splitChunks(x0, z0, x1, z1, (a, b, c, d) => texq(chunkOf((a + c) / 2, (b + d) / 2).gnd, a, b, c, d, y, layer, W(SC[layer]))); }
+  };
+  const paint = (x0, z0, x1, z1, layer, f) => splitChunks(x0, z0, x1, z1, (a, b, c, d) => texq(chunkOf((a + c) / 2, (b + d) / 2).pnt, a, b, c, d, PAINT_Y, layer, f));
+
+  // roads (asphalt), sidewalks, lots, plaza, parks; the outside is low grass
+  flat(isRoad, LY.ASPH, 0);
+  flat((c) => c === CLS.WALK, LY.WALK, CH);
+  flat((c) => c === CLS.LOT, LY.CONC, CH);
+  flat((c) => c === CLS.PLAZA, LY.PAVE, CH);
+  flat((c) => c === CLS.PARK, LY.GRASS, CH + 0.02);
+  flat((c) => c === CLS.OUT, LY.GRASS, -0.35);
+
+  // kerb faces: every raised cell that touches a road cell
+  { const D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dz] of D) {
+      const m = new Uint8Array(NX * NZ);
+      for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) if (isRaised(GRID[j * NX + i]) && isRoad(gc(i + dx, j + dz))) m[j * NX + i] = 1;
+      // merge along the edge direction
+      const alongZ = dx !== 0;
+      const outer = alongZ ? NX : NZ, inner = alongZ ? NZ : NX;
+      for (let o = 0; o < outer; o++) for (let n = 0; n < inner;) {
+        const i = alongZ ? o : n, j = alongZ ? n : o;
+        if (!m[j * NX + i]) { n++; continue; }
+        let k = n; while (k < inner && m[(alongZ ? k : o) * NX + (alongZ ? o : k)]) k++;
+        if (alongZ) {
+          const X = X0 + (dx > 0 ? i + 1 : i) * CELL, za = Z0 + n * CELL, zb = Z0 + k * CELL;
+          splitChunks(X, za, X + 1e-3, zb, (a, b, c, d) => {
+            const gb = chunkOf(X, (b + d) / 2).gnd; const U = [[99, 0], [99, 0], [99, 0], [99, 0]];
+            if (dx > 0) gb.quad([X, 0, d], [X, 0, b], [X, CH, b], [X, CH, d], [1, 0, 0], U, C.curb); else gb.quad([X, 0, b], [X, 0, d], [X, CH, d], [X, CH, b], [-1, 0, 0], U, C.curb);
+          });
+        } else {
+          const Z = Z0 + (dz > 0 ? j + 1 : j) * CELL, xa = X0 + n * CELL, xb = X0 + k * CELL;
+          splitChunks(xa, Z, xb, Z + 1e-3, (a, b, c, d) => {
+            const gb = chunkOf((a + c) / 2, Z).gnd; const U = [[99, 0], [99, 0], [99, 0], [99, 0]];
+            if (dz > 0) gb.quad([a, 0, Z], [c, 0, Z], [c, CH, Z], [a, CH, Z], [0, 0, 1], U, C.curb); else gb.quad([c, 0, Z], [a, 0, Z], [a, CH, Z], [c, CH, Z], [0, 0, -1], U, C.curb);
+          });
+        }
+        n = k;
+      }
+    } }
+
+  // road markings (paint layer): double yellow down the middle of every road run wide enough, dashed lane lines on the wide ones.
+  // Avenues are scanned row by row, streets column by column; identical strips on consecutive lines merge into one quad.
+  { const LANE = 3.6, merge = (lines, emit) => {
+      let prev = new Map();
+      lines.forEach((strips, n) => {
+        const cur = new Map();
+        for (const st of strips) { const key = st.k + '|' + st.a + '|' + st.b, r = prev.get(key); if (r) { r.n1 = n + 1; cur.set(key, r); } else { const nr = { ...st, n0: n, n1: n + 1 }; cur.set(key, nr); emit.push(nr); } }
+        prev = cur;
+      });
+    };
+    const strips = (lo, hi) => { // lo / hi: road edges (m) across the road; returns the paint strips (across-range) for one run
+      const w = hi - lo; if (w < 14) return []; const c = (lo + hi) / 2, out = [{ k: 'D', a: +(c - 1.8).toFixed(2), b: +(c + 1.8).toFixed(2) }];
+      for (let k = 1; k * LANE < w / 2 - 2.5; k++) for (const sg of [-1, 1]) out.push({ k: 'L', a: +(c + sg * k * LANE - 1.8).toFixed(2), b: +(c + sg * k * LANE + 1.8).toFixed(2) });
+      return out;
+    };
+    const av = [], st = [], avE = [], stE = [];
+    for (let j = 0; j < NZ; j++) { const row = []; for (let i = 0; i < NX;) { if (GRID[j * NX + i] !== CLS.AV) { i++; continue; } let k = i; while (k < NX && GRID[j * NX + k] === CLS.AV) k++; row.push(...strips(X0 + i * CELL, X0 + k * CELL)); i = k; } av.push(row); }
+    for (let i = 0; i < NX; i++) { const col = []; for (let j = 0; j < NZ;) { if (GRID[j * NX + i] !== CLS.ST) { j++; continue; } let k = j; while (k < NZ && GRID[k * NX + i] === CLS.ST) k++; col.push(...strips(Z0 + j * CELL, Z0 + k * CELL)); j = k; } st.push(col); }
+    merge(av, avE); merge(st, stE);
+    for (const r of avE) { const za = Z0 + r.n0 * CELL, zb = Z0 + r.n1 * CELL; if (zb - za < 6) continue;
+      paint(r.a, za, r.b, zb, r.k === 'D' ? LY.DBL : LY.DASH, r.k === 'D' ? (x, z) => [(x - r.a) / 3.6, z / 3.6] : (x, z) => [(x - r.a) / 3.6, z / 36]); }
+    for (const r of stE) { const xa = X0 + r.n0 * CELL, xb = X0 + r.n1 * CELL; if (xb - xa < 6) continue;
+      paint(xa, r.a, xb, r.b, r.k === 'D' ? LY.DBL : LY.DASH, r.k === 'D' ? (x, z) => [(z - r.a) / 3.6, x / 3.6] : (x, z) => [(z - r.a) / 3.6, x / 36]); }
   }
-  // wide outskirts: a ring AROUND the grid (never under it) so no two ground layers overlap
-  { const big = new GB(), R = 9000, Y = -0.35, zc = streets[NROW / 2], gf = W(SC[LY.GRASS]);
-    const x0 = xMin - AVH, x1 = xMax + AVH, z0 = zMin - STH, z1 = zMax + STH;
-    texq(big, x0, -R, x1, z0, Y, LY.GRASS, gf); texq(big, x0, z1, x1, R, Y, LY.GRASS, gf); // north / south
-    for (const [a, b] of [[-R, x0], [x1, R]]) { texq(big, a, -R, b, zc - STH, Y, LY.GRASS, gf); texq(big, a, zc + STH, b, R, Y, LY.GRASS, gf); } // west / east, with a gap for the road
-    const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m); }
+
+  // outskirts beyond the raster (never under it), plus the two exit roads running on to the horizon
+  { const big = new GB(), R = 9000, Y = -0.35, gf = W(SC[LY.GRASS]), rx0 = X0, rx1 = X0 + NX * CELL, rz0 = Z0, rz1 = Z0 + NZ * CELL;
+    texq(big, rx0, -R, rx1, rz0, Y, LY.GRASS, gf); texq(big, rx0, rz1, rx1, R, Y, LY.GRASS, gf); // north / south
+    for (const [a, b, e] of [[-R, rx0, EXITS.W], [rx1, R, EXITS.E]]) { texq(big, a, -R, b, e.z - e.half, Y, LY.GRASS, gf); texq(big, a, e.z + e.half, b, R, Y, LY.GRASS, gf); } // west / east, with a gap for the road
+    const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m);
+    for (const [a, b, e] of [[rx0 - 1500, rx0, EXITS.W], [rx1, rx1 + 1500, EXITS.E]]) for (let x = a; x < b; x += 300) tq(x, e.z - e.half, Math.min(b, x + 300), e.z + e.half, LY.ASPH, W(SC[0])); }
+  function tq(x0, z0, x1, z1, layer, f) { texq(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd, x0, z0, x1, z1, 0, layer, f); }
 
   // ---------------------------------------------------------------- buildings
   const solids = new Solids(), zips = new ZipPoints();
@@ -254,14 +297,14 @@ export async function buildCity({ scene, renderer }) {
     const ch = chunkOf(x, z); ch.trees.push([x, z, s, hash2(x * 7, z * 3)]);
     solids.cyl(x, z, 0, 3.4 * s, 0.3 * s, 0.3 * s, 'trunk');
   };
-  for (const B of blocks) {
-    const rnd = mulberry32(0x7EE + B.c * 53 + B.r * 191);
-    if (B.kind === KINDS.KIND_PARK) { for (let x = B.px0 + 8; x < B.px1 - 6; x += 15) for (let z = B.pz0 + 8; z < B.pz1 - 6; z += 15) if (rnd() < 0.75) addTree(x + (rnd() - 0.5) * 9, z + (rnd() - 0.5) * 9, 0.8 + rnd() * 0.7); }
-    else if (B.kind === KINDS.KIND_PLAZA) { for (let i = 0; i < 9; i++) { const x = B.px0 + 10 + rnd() * (B.px1 - B.px0 - 20), z = B.pz0 + 10 + rnd() * (B.pz1 - B.pz0 - 20); addTree(x, z, 0.8 + rnd() * 0.5); } }
-    else if (B.h < 0.5) { // street trees on the two avenue sidewalks of some blocks
-      for (const x of [B.x0 + G.AV_WALK * 0.5, B.x1 - G.AV_WALK * 0.5]) for (let z = B.pz0 + 12; z < B.pz1 - 8; z += 46) if (rnd() < 0.7) addTree(x, z, 0.75 + rnd() * 0.4);
-    }
-  }
+  { const rnd = mulberry32(0x7EE);
+    for (const P of PARKS) for (let x = P[0] + 8; x < P[2] - 6; x += 15) for (let z = P[1] + 8; z < P[3] - 6; z += 15) if (rnd() < 0.75) addTree(x + (rnd() - 0.5) * 9, z + (rnd() - 0.5) * 9, 0.8 + rnd() * 0.7);
+    // street trees on the sidewalk next to the kerb, sparse
+    for (let j = 1; j < NZ - 1; j++) for (let i = 1; i < NX - 1; i++) {
+      if (GRID[j * NX + i] !== CLS.WALK || (i + j) % 7 !== 0) continue;
+      if (!(isRoad(gc(i + 1, j)) || isRoad(gc(i - 1, j)) || isRoad(gc(i, j + 1)) || isRoad(gc(i, j - 1)))) continue;
+      if (hash2(i * 7 + 3, j * 13 + 5) < 0.22) addTree(X0 + (i + 0.5) * CELL, Z0 + (j + 0.5) * CELL, 0.75 + rnd() * 0.4);
+    } }
   const treeMeshes = [];
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _c = new THREE.Color();
   for (const ch of chunks.values()) {
@@ -287,17 +330,15 @@ export async function buildCity({ scene, renderer }) {
   })() : null;
   if (PG) {
     const rp = mulberry32(0xB0B5), put = (name, x, y, z, yaw, sc = 1) => { if (PG[name]) chunkOf(x, z).props.push([name, x, y, z, yaw, sc]); };
-    let subways = 0;
-    for (const ax of avenues) for (const sz of streets) for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      const x = ax + sx * (AVH + 1.1), z = sz + sy * (STH + 1.1);
-      if (x < xMin - AVH || x > xMax + AVH || z < zMin - STH || z > zMax + STH) continue;
-      const r = rp();
-      if (r < 0.05 && subways < 8) { subways++; const yaw = sx > 0 ? 0 : Math.PI; put('subway', x + sx * 2.2, CH, z, yaw); solids.box(x + sx * 2.2 - 2.5, CH, z - 1, x + sx * 2.2 + 2.5, CH + 2.2, z + 1, 'equipment'); }
-      else if (r < 0.07) put('payphone', x, CH, z, rp() * 6.28);
-      else if (r < 0.6) put('signpole', x, CH, z, rp() * 6.28);
+    for (let j = 1; j < NZ - 1; j++) for (let i = 1; i < NX - 1; i++) { // street furniture on the sidewalk, next to the kerb
+      if (GRID[j * NX + i] !== CLS.WALK) continue;
+      if (!(isRoad(gc(i + 1, j)) || isRoad(gc(i - 1, j)) || isRoad(gc(i, j + 1)) || isRoad(gc(i, j - 1)))) continue;
+      const r = hash2(i * 13 + 5, j * 7 + 1); if (r > 0.014) continue;
+      const x = X0 + (i + 0.5) * CELL, z = Z0 + (j + 0.5) * CELL;
+      if (r < 0.002) put('payphone', x, CH, z, rp() * 6.28); else put('signpole', x, CH, z, rp() * 6.28);
     }
     for (const B of blocks) {
-      if (B.kind === KINDS.KIND_PARK || rp() > 0.3) continue;
+      if (!B.rect || B.kind !== KINDS.KIND_BUILD || rp() > 0.3) continue;
       const x = B.x0 + 6 + rp() * (B.x1 - B.x0 - 12), z = B.z0 + 1.4;
       put('dumpster', x, CH, z, 0); solids.box(x - 1, CH, z - 0.6, x + 1, CH + 1.3, z + 0.6, 'equipment');
       if (rp() < 0.7) put('drum', x + 2.2, CH, z, rp() * 6.28);
@@ -339,19 +380,17 @@ export async function buildCity({ scene, renderer }) {
 
   // ---------------------------------------------------------------- queries
   const terrainHeight = (x, z) => {
-    if (x < xMin - AVH - 1 || x > xMax + AVH + 1 || z < zMin - STH - 1 || z > zMax + STH + 1) {
-      const zc = streets[NROW / 2]; return Math.abs(z - zc) < STH && Math.abs(x) < 2600 ? 0 : -0.05;
-    }
-    const t = streetsAt(x, z).type;
-    if (t === 'avenue' || t === 'street' || t === 'intersection') return 0;
-    return t === 'park' ? CH + 0.02 : CH;
+    const c = cellAt(x, z);
+    if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; return Math.abs(z - e.z) < e.half && Math.abs(x) < 2600 ? 0 : -0.05; }
+    if (c >= CLS.AV && c <= CLS.INT) return 0;
+    return c === CLS.OUT ? -0.05 : c === CLS.PARK ? CH + 0.02 : CH;
   };
   const grid = new CollisionGrid(solids, 24);
   const finZ = zips.finalize(grid);
   const { groundHeight, raycast, surfaceAt } = makeQueries(grid, terrainHeight);
   const geoDebug = createGeoDebug(root, grid, finZ, collisionDebugLines);
 
-  const spawn = new THREE.Vector3(0, 0, streets[NROW / 2] + STH + 4);
+  const spawn = new THREE.Vector3(SPAWN[0], 0, SPAWN[1]);
   // viewpoints for the screenshot tool / camera shots
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const viewpoints = {
@@ -365,14 +404,18 @@ export async function buildCity({ scene, renderer }) {
       viewpoints.wall = { pos: V(a.x - 3.2, a.y + 1, a.z + 2), target: V(a.x, a.y - 4, a.z - 30), anchor: a, normal: V(-1, 0, 0) };
       viewpoints.climb = { pos: V(a.x - 3.2, a.y + 1.2, a.z + 2.2), target: V(a.x, a.y + 1.5, a.z - 3), anchor: a, normal: V(-1, 0, 0) }; } }
 
-  const mapFeatures = () => ({
-    bounds: { x0: xMin - 200, z0: zMin - 200, x1: xMax + 200, z1: zMax + 200 },
-    land: [[[xMin - 200, zMin - 200], [xMax + 200, zMin - 200], [xMax + 200, zMax + 200], [xMin - 200, zMax + 200]]],
-    farLand: [], blocks: blocks.map(b => ({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 })), buildings: footprints,
-    streets: [...avenues.map(x => ({ x0: x - AVH, z0: zMin - STH, x1: x + AVH, z1: zMax + STH, kind: 'avenue' })), ...streets.map(z => ({ x0: xMin - AVH, z0: z - STH, x1: xMax + AVH, z1: z + STH, kind: 'street' }))],
-    water: [], parks: blocks.filter(b => b.kind === KINDS.KIND_PARK).map(b => [[b.px0, b.pz0], [b.px1, b.pz0], [b.px1, b.pz1], [b.px0, b.pz1]]),
-    parkWater: [], avenueNames: avenues.map((x, i) => ({ x, name: 'AVENUE ' + String.fromCharCode(65 + i) })), inPark,
-  });
+  let MF = null;
+  const mapFeatures = () => MF ??= (() => {
+    const rr = (pred, kind) => rectsOf(pred).map((r) => { const [x0, z0, x1, z1] = toW(r); return kind ? { x0, z0, x1, z1, kind } : { x0, z0, x1, z1 }; });
+    return {
+      bounds: { x0: G.X_MIN - 200, z0: G.Z_MIN - 200, x1: G.X_MAX + 200, z1: G.Z_MAX + 200 },
+      land: [[[G.X_MIN - 200, G.Z_MIN - 200], [G.X_MAX + 200, G.Z_MIN - 200], [G.X_MAX + 200, G.Z_MAX + 200], [G.X_MIN - 200, G.Z_MAX + 200]]],
+      farLand: [], blocks: rr((c) => c >= CLS.WALK && c !== CLS.PARK), buildings: footprints,
+      streets: [...rr((c) => c === CLS.AV, 'avenue'), ...rr((c) => c === CLS.ST || c === CLS.INT, 'street')],
+      water: [], parks: PARKS.map((p) => [[p[0], p[1]], [p[2], p[1]], [p[2], p[3]], [p[0], p[3]]]),
+      parkWater: [], avenueNames: avenues.map((x, i) => ({ x, name: 'AVENUE ' + String.fromCharCode(65 + i) })), inPark,
+    };
+  })();
 
   let time = 0, nk = -1;
   const camParam = new URLSearchParams(location.search).get('cam');
@@ -407,11 +450,7 @@ export async function buildCity({ scene, renderer }) {
     },
   };
   attachLife(world, { traffic: null, crowd: null, pigeons: null });
-  // street traffic: 1-D lane followers on the grid (opentraffic.js), real vehicles.glb models; density = Options > Vehicle Density
-  try {
-    const OT = createOpenTraffic({ models: await loadVehicleModels(renderer), group: root, scale: globalThis.__TRAFFIC_SCALE ?? 0.12 });
-    if (OT) { world.openTraffic = OT; const u0 = world.update; world.update = (dt, camera) => { u0(dt, camera); const D = globalThis.__DRAW_DIST ?? bootDD; OT.update(dt, camera, Math.min(Number.isFinite(D) ? D : 1100, 1100)); }; }
-  } catch (e) { console.warn('[citylite] open traffic unavailable', e); }
+  // street traffic is off for now: opentraffic.js follows the old straight avenue / street grid, the new layout has no such grid
   console.log(`[citylite] built in ${(performance.now() - t0).toFixed(0)} ms: ${lots.length} buildings (${nMass} masses), ${chunks.size} chunks, ${treeMeshes.reduce((a, m) => a + m.count, 0)} trees, ${grid.n} solids, ${finZ.count} zip points`);
   return world;
 }
