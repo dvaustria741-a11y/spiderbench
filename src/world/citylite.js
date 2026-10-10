@@ -86,6 +86,9 @@ function makeWindowTextures(glass) {
   return { map: mk(cv, true), emissive: mk(ev, true) };
 }
 
+// the open world has no volumetric clouds (sky art comes from sky textures instead, like the reference game)
+globalThis.__OPEN_NO_CLOUDS = true;
+
 export async function buildCity({ scene, renderer }) {
   const t0 = performance.now();
   const boot = globalThis.__boot; await boot?.stage('gen');

@@ -97,7 +97,7 @@ export function initSystems(ctx) {
     const td = { off: 0, low: 0.12, medium: 0.7, high: 1.2 }[s.gfx?.traffic];
     if (td != null) { ctx.world.openTraffic?.setDensity?.(td); ctx.world.life?.traffic?.setDensity?.(td); ctx.world.highways?.setTraffic?.(td > 0); }
     if (s.gfx?.population) ctx.world.life?.crowd?.setEnabled?.(s.gfx.population !== 'off'); // live: Off removes every pedestrian at once
-    { const sp = ctx.lighting?.sky?.params, off = s.gfx?.clouds === 'off'; if (sp && !!sp.cloudsOff !== off) { sp.cloudsOff = off; ctx.lighting.refresh?.(); } } // live: Off removes all clouds
+    { const sp = ctx.lighting?.sky?.params, off = s.gfx?.clouds === 'off' || globalThis.__OPEN_NO_CLOUDS; if (sp && !!sp.cloudsOff !== off) { sp.cloudsOff = off; ctx.lighting.refresh?.(); } } // live: Off removes all clouds
     globalThis.__DRAW_DIST = { low: 500, medium: 1300, high: 2200 }[s.gfx?.drawDist] ?? Infinity; // live on the Open City map (chunks beyond it are not drawn)
     globalThis.__LOD_NEAR = { low: 100, medium: 240, high: 650 }[s.gfx?.lod]; // live: city.js reads it every frame
     globalThis.__LOD_FAR = { low: 260, medium: 520 }[s.gfx?.lod] ?? Infinity; // tile LOD meshes beyond this are not drawn at all
