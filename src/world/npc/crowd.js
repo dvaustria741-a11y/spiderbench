@@ -1277,6 +1277,10 @@ export async function createCrowd({ scene, blocks, parkPaths, props, roads, phas
         }
       }
     }
+    // Options > Graphics > Population Density also thins the fixed people (bench sitters, vendors + queues, bus stops, plazas,
+    // park lawns, promenade): Off = none, Low / Medium keep that share (golden-ratio index pattern, so the same people stay each boot)
+    { const ps = globalThis.__POP_SCALE ?? 1;
+      if (ps < 1) { const kept = []; statics.forEach((a, k) => { if (ps > 0.01 && (k * 0.6180339887) % 1 < ps) kept.push(a); }); statics.length = 0; statics.push(...kept); } }
     for (const a of statics) { initPose(a); a.static = true; }
     for (let i = 0; i < statics.length; i += 64) declone(statics.slice(i, i + 64)); // (peds r2) TS / plaza crowds: no clone pairs
   }
