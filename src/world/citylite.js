@@ -97,7 +97,39 @@ export async function buildCity({ scene, renderer }) {
   const matGround = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
   const matPaint = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 
-  skinGround(matGround, skin); skinGround(matPaint, skin); skinRoof(matFacade, skin); skinRoof(matGlass, skin);
+  skinGround(matGround, skin); skinGround(matPaint, skin);
+
+  // open water: one big plane with low animated waves (normal-only, so it stays cheap). The player can swim in it (world.swimY).
+  const SWIM_Y = -0.8, SEABED = SWIM_Y - 2.4;
+  const waterU = { uWT: { value: 0 } };
+  const matWater = new THREE.MeshStandardMaterial({ color: 0x2f5870, roughness: 0.16, metalness: 0 });
+  matWater.onBeforeCompile = (sh) => {
+    sh.uniforms.uWT = waterU.uWT; if (skin) sh.uniforms.uGT = { value: skin.ground.tex };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uWT; varying vec3 vWPos;
+        ${skin ? 'uniform highp sampler2DArray uGT;' : ''}
+        vec2 waveSlope(vec2 p, float t) {
+          vec2 g = vec2(0.0);
+          g += vec2(0.80, 0.60) * (0.060 * cos(dot(p, vec2(0.80, 0.60)) * 0.45 + t * 1.10));
+          g += vec2(-0.50, 0.87) * (0.045 * cos(dot(p, vec2(-0.50, 0.87)) * 0.80 + t * 1.60 + 1.7));
+          g += vec2(0.20, -0.98) * (0.028 * cos(dot(p, vec2(0.20, -0.98)) * 1.70 + t * 2.30 + 4.1));
+          g += vec2(-0.90, -0.40) * (0.015 * cos(dot(p, vec2(-0.90, -0.40)) * 3.10 + t * 3.10 + 2.2));
+          return g;
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        ${skin ? `{ vec2 q = vWPos.xz / 18.0;
+          vec3 a = texture(uGT, vec3(q + vec2(uWT * 0.012, uWT * 0.007), 10.0)).rgb;
+          vec3 b = texture(uGT, vec3(q * 1.7 + vec2(-uWT * 0.009, uWT * 0.011) + 0.37, 10.0)).rgb;
+          diffuseColor.rgb = mix(diffuseColor.rgb, (a + b) * 0.5, 0.75); }` : ''}`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        { float wd = length(vWPos - cameraPosition); float fade = 1.0 - smoothstep(120.0, 700.0, wd);
+          vec2 gs = waveSlope(vWPos.xz, uWT) * fade;
+          normal = normalize((viewMatrix * vec4(normalize(vec3(-gs.x, 1.0, -gs.y)), 0.0)).xyz); }`);
+  };
+  matWater.customProgramCacheKey = () => 'openWater1' + (skin ? 's' : 'n'); skinRoof(matFacade, skin); skinRoof(matGlass, skin);
 
   // chunk store: one set of builders per 400 m cell
   const chunks = new Map();
@@ -156,13 +188,19 @@ export async function buildCity({ scene, renderer }) {
   };
   const paint = (x0, z0, x1, z1, layer, f) => splitChunks(x0, z0, x1, z1, (a, b, c, d) => texq(chunkOf((a + c) / 2, (b + d) / 2).pnt, a, b, c, d, PAINT_Y, layer, f));
 
+  // OUT cells that are not connected to the raster border are small gaps inside the city: make them lots so no pond appears in a block
+  { const out = new Uint8Array(NX * NZ), st = [];
+    const push = (i, j) => { const k = j * NX + i; if (!out[k] && GRID[k] === CLS.OUT) { out[k] = 1; st.push(k); } };
+    for (let i = 0; i < NX; i++) { push(i, 0); push(i, NZ - 1); } for (let j = 0; j < NZ; j++) { push(0, j); push(NX - 1, j); }
+    while (st.length) { const k = st.pop(), i = k % NX, j = (k / NX) | 0; if (i > 0) push(i - 1, j); if (i < NX - 1) push(i + 1, j); if (j > 0) push(i, j - 1); if (j < NZ - 1) push(i, j + 1); }
+    for (let k = 0; k < NX * NZ; k++) if (GRID[k] === CLS.OUT && !out[k]) GRID[k] = CLS.LOT; }
   // roads (asphalt), sidewalks, lots, plaza, parks; everything outside the city is water
   flat(isRoad, LY.ASPH, 0);
   flat((c) => c === CLS.WALK, LY.WALK, CH);
   flat((c) => c === CLS.LOT, LY.CONC, CH);
   flat((c) => c === CLS.PLAZA, LY.PAVE, CH);
   flat((c) => c === CLS.PARK, LY.GRASS, CH + 0.02);
-  flat((c) => c === CLS.OUT, LY.WATER, -0.1);
+  // (water is a real plane + sea walls below, see the water section)
 
   // kerb faces: every raised cell that touches a road cell
   { const D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -218,12 +256,29 @@ export async function buildCity({ scene, renderer }) {
       paint(xa, r.a, xb, r.b, r.k === 'D' ? LY.DBL : LY.DASH, r.k === 'D' ? (x, z) => [(z - r.a) / 3.6, x / 3.6] : (x, z) => [(z - r.a) / 3.6, x / 36]); }
   }
 
-  // water beyond the raster (never under it), plus the two exit roads running on to the horizon
-  { const big = new GB(), R = 9000, Y = -0.1, gf = W(16), rx0 = X0, rx1 = X0 + NX * CELL, rz0 = Z0, rz1 = Z0 + NZ * CELL;
-    texq(big, rx0, -R, rx1, rz0, Y, LY.WATER, gf); texq(big, rx0, rz1, rx1, R, Y, LY.WATER, gf); // north / south
-    for (const [a, b, e] of [[-R, rx0, EXITS.W], [rx1, R, EXITS.E]]) { texq(big, a, -R, b, e.z - e.half, Y, LY.WATER, gf); texq(big, a, e.z + e.half, b, R, Y, LY.WATER, gf); } // west / east, with a gap for the road
-    const m = new THREE.Mesh(big.build(), matGround); m.receiveShadow = true; m.frustumCulled = false; m.name = 'outskirts'; root.add(m);
-    for (const [a, b, e] of [[rx0 - 1500, rx0, EXITS.W], [rx1, rx1 + 1500, EXITS.E]]) for (let x = a; x < b; x += 300) tq(x, e.z - e.half, Math.min(b, x + 300), e.z + e.half, LY.ASPH, W(SC[0])); }
+  // water: one plane at the swim level under everything (land is higher), vertical sea walls wherever land meets water,
+  // and the two exit roads as causeways running on to the horizon
+  { const U = [[99, 0], [99, 0], [99, 0], [99, 0]], y0 = SEABED, y1 = CH;
+    const wm = new THREE.Mesh(new THREE.PlaneGeometry(18000, 18000).rotateX(-Math.PI / 2), matWater);
+    wm.position.y = SWIM_Y; wm.frustumCulled = false; wm.receiveShadow = true; wm.name = 'water'; root.add(wm);
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) {
+      if (GRID[j * NX + i] === CLS.OUT) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + dx, nj = j + dz; if (ni < 0 || nj < 0 || ni >= NX || nj >= NZ || GRID[nj * NX + ni] !== CLS.OUT) continue;
+        const gb = chunkOf(X0 + (i + 0.5) * CELL, Z0 + (j + 0.5) * CELL).gnd;
+        if (dx) { const X = X0 + (dx > 0 ? i + 1 : i) * CELL, za = Z0 + j * CELL, zb = za + CELL;
+          if (dx > 0) gb.quad([X, y0, zb], [X, y0, za], [X, y1, za], [X, y1, zb], [1, 0, 0], U, C.curb); else gb.quad([X, y0, za], [X, y0, zb], [X, y1, zb], [X, y1, za], [-1, 0, 0], U, C.curb);
+        } else { const Z = Z0 + (dz > 0 ? j + 1 : j) * CELL, xa = X0 + i * CELL, xb = xa + CELL;
+          if (dz > 0) gb.quad([xa, y0, Z], [xb, y0, Z], [xb, y1, Z], [xa, y1, Z], [0, 0, 1], U, C.curb); else gb.quad([xb, y0, Z], [xa, y0, Z], [xa, y1, Z], [xb, y1, Z], [0, 0, -1], U, C.curb);
+        }
+      }
+    }
+    const rx0 = X0, rx1 = X0 + NX * CELL;
+    for (const [a, b, e] of [[rx0 - 1500, rx0, EXITS.W], [rx1, rx1 + 1500, EXITS.E]]) for (let x = a; x < b; x += 300) {
+      const xa = x, xb = Math.min(b, x + 300), zN = e.z - e.half, zS = e.z + e.half, gb = chunkOf((xa + xb) / 2, e.z).gnd;
+      tq(xa, zN, xb, zS, LY.ASPH, W(SC[0]));
+      gb.quad([xb, y0, zN], [xa, y0, zN], [xa, 0, zN], [xb, 0, zN], [0, 0, -1], U, C.curb); gb.quad([xa, y0, zS], [xb, y0, zS], [xb, 0, zS], [xa, 0, zS], [0, 0, 1], U, C.curb);
+    } }
   function tq(x0, z0, x1, z1, layer, f) { texq(chunkOf((x0 + x1) / 2, (z0 + z1) / 2).gnd, x0, z0, x1, z1, 0, layer, f); }
 
   // ---------------------------------------------------------------- buildings
@@ -381,9 +436,9 @@ export async function buildCity({ scene, renderer }) {
   // ---------------------------------------------------------------- queries
   const terrainHeight = (x, z) => {
     const c = cellAt(x, z);
-    if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; return Math.abs(z - e.z) < e.half && Math.abs(x) < 2600 ? 0 : -0.05; }
+    if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; return Math.abs(z - e.z) < e.half && Math.abs(x) < 2600 ? 0 : SEABED; }
     if (c >= CLS.AV && c <= CLS.INT) return 0;
-    return c === CLS.OUT ? -0.05 : c === CLS.PARK ? CH + 0.02 : CH;
+    return c === CLS.OUT ? SEABED : c === CLS.PARK ? CH + 0.02 : CH;
   };
   const grid = new CollisionGrid(solids, 24);
   const finZ = zips.finalize(grid);
@@ -409,7 +464,8 @@ export async function buildCity({ scene, renderer }) {
     const rr = (pred, kind) => rectsOf(pred).map((r) => { const [x0, z0, x1, z1] = toW(r); return kind ? { x0, z0, x1, z1, kind } : { x0, z0, x1, z1 }; });
     return {
       bounds: { x0: G.X_MIN - 200, z0: G.Z_MIN - 200, x1: G.X_MAX + 200, z1: G.Z_MAX + 200 },
-      land: [[[G.X_MIN - 200, G.Z_MIN - 200], [G.X_MAX + 200, G.Z_MIN - 200], [G.X_MAX + 200, G.Z_MAX + 200], [G.X_MIN - 200, G.Z_MAX + 200]]],
+      land: [...rectsOf((c) => c !== CLS.OUT).map((r) => { const [x0, z0, x1, z1] = toW(r); return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]; }),
+        ...[EXITS.W, EXITS.E].map((e, k) => { const a = k ? X0 + NX * CELL : X0 - 1500, b = k ? X0 + NX * CELL + 1500 : X0; return [[a, e.z - e.half], [b, e.z - e.half], [b, e.z + e.half], [a, e.z + e.half]]; })],
       farLand: [], blocks: rr((c) => c >= CLS.WALK && c !== CLS.PARK), buildings: footprints,
       streets: [...rr((c) => c === CLS.AV, 'avenue'), ...rr((c) => c === CLS.ST || c === CLS.INT, 'street')],
       water: [], parks: PARKS.map((p) => [[p[0], p[1]], [p[2], p[1]], [p[2], p[3]], [p[0], p[3]]]),
@@ -434,12 +490,12 @@ export async function buildCity({ scene, renderer }) {
     }
   };
   const world = {
-    raycast, groundHeight, surfaceAt, spawn, viewpoints, streetsAt,
+    raycast, groundHeight, surfaceAt, spawn, viewpoints, streetsAt, swimY: SWIM_Y,
     getZipPoints: (center, radius, kinds) => finZ.query(center, radius, kinds),
     bridgeLimit: null, bridgeDeckY: undefined, propAnchors: () => [], grabbables: () => [], grabProp: () => undefined, releaseProp: () => undefined,
     collision: grid, geoDebug, buildings: boxes, footprints, getMapFeatures: mapFeatures, textures: {}, materials: { facade: matFacade, glass: matGlass },
     update(dt, camera) {
-      time += dt;
+      time += dt; waterU.uWT.value = time;
       const k = nightK.value;
       if (Math.abs(k - nk) > 0.005) { nk = k; matFacade.emissiveIntensity = k * 1.1; matGlass.emissiveIntensity = k * 1.4; }
       if (camera) {

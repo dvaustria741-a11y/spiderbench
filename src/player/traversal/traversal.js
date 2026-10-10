@@ -140,6 +140,7 @@ export function createTraversal({ world, cam, web, rig, camera }) {
     if (s.mode === 'swing' && mode !== 'swing' && lastInput?.swing && !leaveSwingOK)
       console.error(`[traversal] BUG: left 'swing' -> '${mode}/${sub}' while the swing button is held (web must stay attached)`);
     if (s.mode !== mode) s.modeT = 0; s.mode = mode; setSub(sub);
+    if (mode !== 'ground') s.swim = false;
   }
   // skill scaling (progression 'swingReleaseBoost'); set by the systems layer via traversal.setStats, else read ctx.params
   const stats = {};
@@ -160,10 +161,12 @@ export function createTraversal({ world, cam, web, rig, camera }) {
 
   // ------------------------------------------------------------------ ground
   function enterGround(sub = 'idle') {
+    s.swim = false;
     setMode('ground', sub); s.grounded = true; s.vel.y = 0; s.dashCount = 0; s.dive = false; s.trick = null; s.quick.n = 0;
     const hs = Math.hypot(s.vel.x, s.vel.z); s.speed = hs; if (hs > 3) s.facing = Math.atan2(s.vel.x, s.vel.z); // (tiny residual velocity never flips facing)
   }
   function stepGround(h, I) {
+    if (s.swim) { stepSwim(h, I); return; }
     const inD = inputDir(I, new THREE.Vector3()); const mag = Math.min(1, inD.length()); if (mag > 1e-3) inD.divideScalar(mag);
     // user r12: Shift on the ground = WALK (keyboard only; I.walk). Shift is no longer ground parkour — RMB / R2 still are
     // (on the pad R2 sets sprint + swing, so its parkour is unchanged); Shift pushing into a tall wall still wall-runs.
@@ -532,6 +535,7 @@ export function createTraversal({ world, cam, web, rig, camera }) {
   // splashes and immediately web-yanks himself back onto the nearest dry ground on a ballistic arc.
   const WATER_Y = -1.0;
   function waterBounce() {
+    if (world.swimY != null) return enterSwim(); // open map: real water, he swims
     let best = null, bd = Infinity;
     for (let r = 4; r <= 120 && !best; r += 4) {
       for (let k = 0; k < 24; k++) {
@@ -557,6 +561,67 @@ export function createTraversal({ world, cam, web, rig, camera }) {
     web.attach(rig.handWorld('R'), tgt, _v2.set(0, 1, 0)); s.dashWebT = 0.3;
     events.push({ type: 'waterSplash', severity: clamp(-s.vel.y / 40, 0.2, 1) }, { type: 'pointLaunch' });
     return true;
+  }
+  // ---- swimming (open map only: world.swimY is the water surface). Chest-deep and bobbing, slower than running, the
+  // ground clips play on top (the legs are under the water plane). Space (or pushing into the sea wall) hops out onto the
+  // nearest shore, RMB swings off anything in reach, a jump in open water is a small leap.
+  function enterSwim() {
+    const Y = world.swimY, vx = s.vel.x, vz = s.vel.z, hs = Math.hypot(vx, vz), impact = Math.max(0, -s.vel.y);
+    web.release(); s.kin = null; s.charging = false; s.dive = false; s.gliding = false; s.trick = null; s.noAnchorT = 0; s.returnT = 0;
+    setMode('ground', 'swim'); s.swim = true; s.grounded = true; s.dashCount = 0; s.quick.n = 0; s.swimBlock = 0;
+    s.speed = Math.min(hs * 0.45, 5); s.vel.set(vx * 0.4, 0, vz * 0.4); if (hs > 3) s.facing = Math.atan2(vx, vz);
+    s.pos.y = Y - 0.95 + H; s.floorY = Y - 0.95; s.stepOff = 0;
+    events.push({ type: 'waterSplash', severity: clamp(impact / 40, 0.25, 1) });
+    return true;
+  }
+  function swimHop() {
+    const Y = world.swimY; let best = null, bs = Infinity;
+    for (let r = 1.2; r <= 6.5; r += 0.8) for (let k = 0; k < 16; k++) {
+      const a = k / 16 * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a), x = s.pos.x + dx * r, z = s.pos.z + dz * r;
+      const gy = world.groundHeight(x, z, 200);
+      if (gy < Y + 0.3 || gy > Y + 3.5) continue;
+      const sc = r - 1.6 * (dx * Math.sin(s.facing) + dz * Math.cos(s.facing));
+      if (sc < bs) { bs = sc; best = { x, z, dx, dz }; }
+    }
+    if (!best) return false;
+    let tx = best.x + best.dx * 1.3, tz = best.z + best.dz * 1.3, ty = world.groundHeight(tx, tz, 200);
+    if (ty < Y + 0.3) { tx = best.x; tz = best.z; ty = world.groundHeight(tx, tz, 200); }
+    const fy = feetY(), hd = Math.hypot(tx - s.pos.x, tz - s.pos.z), tf = clamp(0.42 + hd / 14, 0.5, 0.95);
+    s.vel.set((tx - s.pos.x) / tf, (ty + 0.1 - fy) / tf + 0.5 * G * tf, (tz - s.pos.z) / tf);
+    setMode('air', 'rise'); s.swim = false; s.grounded = false; s.airT = 0; s.apexY = fy; s.coyote = 0; s.swingCooldown = 0.3; s.wallCooldown = 0.3;
+    s.facing = Math.atan2(s.vel.x, s.vel.z); s.speed = 0; s.trick = null; s.dive = false; s.gliding = false;
+    events.push({ type: 'waterSplash', severity: 0.35 });
+    return true;
+  }
+  function stepSwim(h, I) {
+    const Y = world.swimY, inD = inputDir(I, new THREE.Vector3()), mag = Math.min(1, inD.length());
+    if (mag > 1e-3) inD.divideScalar(mag);
+    let target = 0;
+    if (mag > 0.08) {
+      target = (I.sprint || I.swing ? 6.5 : 4.0) * clamp(mag / 0.6, 0.35, 1);
+      const d = angWrap(Math.atan2(inD.x, inD.z) - s.facing); s.facing += clamp(d, -9 * h, 9 * h);
+      target *= clamp(1 - Math.max(0, Math.abs(d) - 0.9) * 0.5, 0.4, 1);
+    }
+    s.speed = target > s.speed ? Math.min(target, s.speed + 9 * h) : Math.max(target, s.speed - 7 * h);
+    const fx = Math.sin(s.facing), fz = Math.cos(s.facing);
+    s.vel.set(fx * s.speed, 0, fz * s.speed);
+    const nx = s.pos.x + s.vel.x * h, nz = s.pos.z + s.vel.z * h;
+    if (world.groundHeight(nx, nz, 200) > Y - 0.3) { s.swimBlock = (s.swimBlock || 0) + (mag > 0.5 ? h : 0); s.speed = 0; s.vel.set(0, 0, 0); } // sea wall / pier ahead
+    else { s.pos.x = nx; s.pos.z = nz; s.swimBlock = 0; }
+    collide();
+    s.pos.y = Y - 0.95 + Math.sin(s.clock * 2.3) * 0.045 + Math.sin(s.clock * 6) * 0.012 * Math.min(1, s.speed / 4) + H;
+    s.floorY = Y - 0.95; s.grounded = true; s.stepOff = 0; setSub('swim');
+    if (standAt(s.pos.x, s.pos.z, feetY() + STEP) > Y - 0.5) { enterGround('idle'); return; } // a boat deck / pier under him: just stand
+    if (I.swingPressed && s.swingCooldown <= 0) { // swing off anything in reach, like from the ground
+      const fwd = travelDir(I, travel), probe = _v.copy(s.pos); probe.y += 3;
+      const a = anchors.find(probe, fwd, null, Math.max(s.speed, 10), s.floorY);
+      if (a && a.point.y > s.pos.y + 6) { s.swim = false; enterGround('idle'); s.jumpCharge = 0.35; launchJump(true); s.groundSwing = true; s.swingCooldown = 0.1; return; }
+    }
+    if (I.jumpPressed || s.swimBlock > 0.35) {
+      if (swimHop()) return;
+      s.swimBlock = 0;
+      if (I.jumpPressed) { s.vel.y = 7.5; setMode('air', 'rise'); s.swim = false; s.grounded = false; s.airT = 0; s.apexY = feetY(); s.coyote = 0; events.push({ type: 'waterSplash', severity: 0.3 }); }
+    }
   }
   // (bridges r1) Halfway rule on the East River bridges (world.bridgeLimit, bridges.js bridgeLimits): past a bridge's
   // mid-span (on the deck, swinging, perched on a cable or falling) he is web-yanked back toward Manhattan on a
