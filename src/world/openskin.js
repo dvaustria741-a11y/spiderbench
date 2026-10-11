@@ -46,7 +46,7 @@ export function skinGround(mat, skin) {
       .replace('#include <common>', '#include <common>\nvarying float vSurf; varying float vUpN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurf = uv.x; vUpN = normal.y;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform highp sampler2DArray uGT; varying float vSurf; varying float vUpN;')
+      .replace('#include <common>', '#include <common>\nuniform highp sampler2DArray uGT; varying float vSurf; varying float vUpN;\nfloat hsh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}\nfloat vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hsh(i),hsh(i+vec2(1.0,0.0)),f.x),mix(hsh(i+vec2(0.0,1.0)),hsh(i+vec2(1.0,1.0)),f.x),f.y);}')
       .replace('#include <color_fragment>', `#include <color_fragment>
   if (vSurf < 50.0) {
     float L = floor(vSurf + 0.5);
@@ -55,10 +55,14 @@ export function skinGround(mat, skin) {
       float sl = smoothstep(0.9985, 0.991, vUpN);
       if (sl > 0.0) tc = mix(tc, texture(uGT, vec3(vColor.xy * 0.83 + 0.31, 8.0)).rgb, sl);
     }
+    if (L < 9.5 || L > 10.5) { // soft low-res photo-like mottling (not on water); +-14 % over ~10-40 m
+      float mv = vn(vColor.xy * 0.37) * 0.5 + vn(vColor.xy * 1.1 + 7.3) * 0.3 + vn(vColor.xy * 3.3 + 3.1) * 0.2;
+      tc *= 0.86 + 0.28 * mv;
+    }
     diffuseColor.rgb = tc;
   }`);
   };
-  mat.customProgramCacheKey = () => 'openSkinGround3';
+  mat.customProgramCacheKey = () => 'openSkinGround4';
 }
 
 // roofs: every upward-facing face of the facade / glass materials; one of 4 roof types per 48 m cell
