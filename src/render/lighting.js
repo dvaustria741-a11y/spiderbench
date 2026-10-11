@@ -97,6 +97,16 @@ export const PRESETS = {
 PRESETS.dayB = { elevation: 55, azimuth: 58, look: { ...PRESETS.day.look } };
 PRESETS.dayC = { elevation: 44, azimuth: 160, look: { ...PRESETS.day.look } };
 export const DAY_SUNS = { a: 'day', b: 'dayB', c: 'dayC' };
+// (open map) Spider Fuser look for the Open World map: soft, flat, hazy daylight. Much more sky/bounce fill and a gentler key than the
+// Manhattan 'day' (shade only slightly darker than lit ground, soft low-contrast shadows), a touch desaturated, cool haze.
+// sf / sfB / sfC replace day / dayB / dayC on the open map only (see resolvePreset); they are not listed in lighting.presets.
+const SF_LOOK = { vertFill: 0.85, vertBounce: 0.55, warm: 0.1, env: 1.75, envSpec: 0.55, envSat: 0.55, sun: 1.05, exposure: 0.92, clouds: 0.6, fog: 1.25, mie: 0.6, bounce: 0.6, groundBounce: 1.0, glow: 0.1, fogTint: [0.74, 0.8, 0.9] };
+PRESETS.sf = { elevation: 58, azimuth: 118, look: { ...SF_LOOK } };
+PRESETS.sfB = { elevation: 50, azimuth: 58, look: { ...SF_LOOK } };
+PRESETS.sfC = { elevation: 44, azimuth: 160, look: { ...SF_LOOK } };
+const OPEN_MAP = (() => { try { const p = new URLSearchParams(location.search).get('map'); return p ? p === 'open' : localStorage.getItem('sb_map') === 'open'; } catch (e) { return false; } })();
+const OPEN_SWAP = { day: 'sf', dayB: 'sfB', dayC: 'sfC' };
+
 // old names (settings saves, ?tod=, tools) -> closest preset
 const PRESET_ALIAS = { default: 'day', noon: 'day', afternoon: 'day', golden: 'sunset', dawn: 'sunrise', rain: 'overcast', cycle: 'day' };
 export const TOD_PRESETS = PRESETS;
@@ -308,7 +318,8 @@ export function createLighting({ renderer, scene }) {
 
   const LOOK_NUM = ['vertFill', 'vertBounce', 'overcast', 'env', 'envSpec', 'envSat', 'sun', 'warm', 'fog', 'mie', 'clouds', 'exposure', 'bounce', 'groundBounce', 'glow', 'windows', 'wet', 'rain', 'flare', 'skyDusk', 'moonEl', 'moonAz'];
   function resolvePreset(name) {
-    const n = PRESETS[name] ? name : (PRESET_ALIAS[name] ?? 'day');
+    let n = PRESETS[name] ? name : (PRESET_ALIAS[name] ?? 'day');
+    if (OPEN_MAP && OPEN_SWAP[n]) n = OPEN_SWAP[n]; // Open World: Spider Fuser look for the day presets
     const d = PRESETS[n], base = lookAt(d.elevation);
     const look = { windows: smooth(3, -7, d.elevation), wet: 0, rain: 0, overcast: 0, vertFill: 1, vertBounce: 1, flare: 1, skyDusk: 1, moonEl: 36, moonAz: d.azimuth + 180, ...base, ...d.look };
     look.fogTint = [...(d.look.fogTint ?? base.fogTint)];
@@ -385,7 +396,7 @@ export function createLighting({ renderer, scene }) {
     setTimeMode, nightK, moon,
     setDryPuddles(on = true) { ambShared.wx.w = on ? 1 : 0; }, // (user r-nopuddles) Settings > Puddles
     get cycle() { return { on: false, hour: tod.hour ?? 12, minutes: 0 }; }, // (lighting2 r3) compat: no clock any more (old readers of .cycle.hour)
-    presets: Object.keys(PRESETS),
+    presets: Object.keys(PRESETS).filter((k) => !k.startsWith('sf')),
     update(camera, dt = 1 / 60) {
       const nowS = performance.now() / 1000, rdt = state.lastT ? Math.min(nowS - state.lastT, 0.1) : dt; state.lastT = nowS; // (main.js passes no dt)
       if (blend.on) stepBlend(rdt);
