@@ -298,11 +298,12 @@ export async function buildCity({ scene, renderer }) {
   // sidewalk-textured ribbon along a smooth polyline (outside on the right): faces(A, B, at, nn, emit) adds the quads of one segment
   const ribbon = (key, name, faces) => {
     const [pb, lens] = LINES[key]; if (!lens.length) return;
-    const P = i16(pb), gb = new GB(), f = W(SC[LY.WALK]); let o = 0;
-    const emit = (pts, N) => {
+    const P = i16(pb), gb = new GB(), fs = { [LY.WALK]: W(SC[LY.WALK]), [LY.ASPH]: W(SC[LY.ASPH]) }; let o = 0;
+    const emit = (pts, N, layer = LY.WALK) => {
+      const f = fs[layer];
       const a = pts[0], b = pts[1], c = pts[2], ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
       const d = (uy * vz - uz * vy) * N[0] + (uz * vx - ux * vz) * N[1] + (ux * vy - uy * vx) * N[2];
-      for (const i of d >= 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]) { const q = pts[i]; gb.p.push(q[0], q[1], q[2]); gb.n.push(N[0], N[1], N[2]); if (TEX) { const t = f(q[0], q[2]); gb.u.push(LY.WALK, 0); gb.c.push(t[0], t[1], 0); } else { gb.u.push(99, 0); gb.c.push(C.lot[0], C.lot[1], C.lot[2]); } }
+      for (const i of d >= 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]) { const q = pts[i]; gb.p.push(q[0], q[1], q[2]); gb.n.push(N[0], N[1], N[2]); if (TEX) { const t = f(q[0], q[2]); gb.u.push(layer, 0); gb.c.push(t[0], t[1], 0); } else { gb.u.push(99, 0); gb.c.push(C.lot[0], C.lot[1], C.lot[2]); } }
     };
     for (const n of lens) {
       const v = [];
@@ -320,7 +321,7 @@ export async function buildCity({ scene, renderer }) {
   const slabLines = (key) => {
     const yT = CH + 0.005, yB = CH - LIP_T, dS = LIP_T * SLOPE_RUN; // dS: where the slope surface is at the slab underside
     ribbon(key, 'lip-', (A, B, at, nn, emit) => {
-      emit([at(A, -0.2, yT), at(B, -0.2, yT), at(B, LIP_OUT, yT), at(A, LIP_OUT, yT)], [0, 1, 0]);      // top (the sidewalk, extended)
+      emit([at(A, -1.2, yT), at(B, -1.2, yT), at(B, LIP_OUT, yT), at(A, LIP_OUT, yT)], [0, 1, 0]);      // top (the sidewalk, extended)
       emit([at(A, LIP_OUT, yT), at(B, LIP_OUT, yT), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], nn);        // front face
       emit([at(A, dS, yB), at(B, dS, yB), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], [0, -1, 0]);          // underside of the overhang
     });
@@ -329,8 +330,9 @@ export async function buildCity({ scene, renderer }) {
   // level inside that footprint (no wall, no ramp over the asphalt), so there is no gap, no dark line and no double strip.
   const kerbLines = (key) => {
     ribbon(key, 'kerb-', (A, B, at, nn, emit) => {
-      emit([at(A, -0.9, CH + 0.004), at(B, -0.9, CH + 0.004), at(B, -0.3, CH + 0.004), at(A, -0.3, CH + 0.004)], [0, 1, 0]);
-      emit([at(A, -0.3, CH + 0.004), at(B, -0.3, CH + 0.004), at(B, 0.0, 0.01), at(A, 0.0, 0.01)], [nn[0] * 0.45, 0.89, nn[2] * 0.45]);
+      emit([at(A, -1.2, CH + 0.004), at(B, -1.2, CH + 0.004), at(B, -0.3, CH + 0.004), at(A, -0.3, CH + 0.004)], [0, 1, 0]);              // sidewalk, extended out over the hole
+      emit([at(A, -0.3, CH + 0.004), at(B, -0.3, CH + 0.004), at(B, 0.0, 0.006), at(A, 0.0, 0.006)], [nn[0] * 0.45, 0.89, nn[2] * 0.45]);     // eases down to the road
+      emit([at(A, 0.0, 0.006), at(B, 0.0, 0.006), at(B, 1.3, 0.006), at(A, 1.3, 0.006)], [0, 1, 0], LY.ASPH);                                 // road, extended in to meet the asphalt mesh
     });
   };
 
