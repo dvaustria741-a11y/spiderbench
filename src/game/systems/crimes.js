@@ -44,15 +44,18 @@ export function createCrimes(sys) {
 
   // (dev menu) a sidewalk spot 28-60 m from p (widening if there is none), preferring the direction `fwd`; `out`
   // points from the building line to the nearest roadway, like pickSpot's
+  // dry ground: land at the point and on a ring 9 m around it, and ground above the waterline (no sea wall edge / ocean)
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [.7, .7], [-.7, .7], [.7, -.7], [-.7, -.7]];
+  const dry = (x, z) => onLand(x, z) && ctx.world.groundHeight(x, z, 3) > -0.5 && DIRS.every(([dx, dz]) => onLand(x + dx * 9, z + dz * 9));
   function pickSpotNear(type, p, fwd) {
     const road = t => t === 'avenue' || t === 'street' || t === 'intersection';
-    const sideOK = (x, z) => { const q = streetsAt(x, z); return q.type === 'sidewalk' && !q.island && onLand(x, z) && ctx.world.groundHeight(x, z, 3) < 1.2; };
+    const sideOK = (x, z) => { const q = streetsAt(x, z); return q.type === 'sidewalk' && !q.island && dry(x, z) && ctx.world.groundHeight(x, z, 3) < 1.2; };
     for (const [r0, r1] of [[28, 60], [55, 120], [110, 240]]) {
       for (let tries = 0; tries < 120; tries++) {
         const base = fwd ? Math.atan2(fwd.x, fwd.z) : 0, spread = fwd && tries < 70 ? 1.2 : Math.PI;
         const a = base + (Math.random() * 2 - 1) * spread, r = r0 + Math.random() * (r1 - r0);
         const x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r;
-        if (type === 'carChase') { const ax = avenues.reduce((b, v) => (Math.abs(v - x) < Math.abs(b - x) ? v : b), avenues[0]), sz = G.ST_SP * Math.round(z / G.ST_SP); if (streetsAt(ax, sz).type === 'intersection') return { pos: new THREE.Vector3(ax, 0, sz) }; continue; }
+        if (type === 'carChase') { if (!dry(x, z)) continue; const ax = avenues.reduce((b, v) => (Math.abs(v - x) < Math.abs(b - x) ? v : b), avenues[0]), sz = G.ST_SP * Math.round(z / G.ST_SP); if (streetsAt(ax, sz).type === 'intersection') return { pos: new THREE.Vector3(ax, 0, sz) }; continue; }
         if (!sideOK(x, z)) continue;
         let out = null;
         for (const d of [2, 3.5, 5, 7]) { for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!out && road(streetsAt(x + dx * d, z + dz * d).type)) out = new THREE.Vector3(dx, 0, dz); if (out) break; }
@@ -69,7 +72,7 @@ export function createCrimes(sys) {
     for (let tries = 0; tries < 60; tries++) {
       const a = rnd() * Math.PI * 2, r = 170 + rnd() * 260;
       const x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r;
-      if (!onLand(x, z)) continue;
+      if (!dry(x, z)) continue;
       const ax = avenues.reduce((b, v) => (Math.abs(v - x) < Math.abs(b - x) ? v : b), avenues[0]), sz = G.ST_SP * Math.round(z / G.ST_SP);
       if (type === 'carChase') {
         if (streetsAt(ax, sz).type !== 'intersection') continue;
@@ -78,7 +81,7 @@ export function createCrimes(sys) {
       // sidewalk mid-block along an avenue; `out` points from the building line toward the road
       const side = rnd() < 0.5 ? -1 : 1;
       const px = ax + side * (G.AV_HALF + G.AV_WALK * 0.5), pz = sz + (rnd() < 0.5 ? -1 : 1) * (18 + rnd() * 20);
-      if (streetsAt(px, pz).type !== 'sidewalk') continue;
+      if (streetsAt(px, pz).type !== 'sidewalk' || !dry(px, pz)) continue;
       return { pos: new THREE.Vector3(px, ctx.world.groundHeight(px, pz), pz), out: new THREE.Vector3(-side, 0, 0) };
     }
     return null;
@@ -225,14 +228,14 @@ export function createCrimes(sys) {
   function startChase(c) {
     const g = roadGraph();
     let idx = -1, bd = Infinity;
-    g.nodes.forEach((n, i) => { const d = Math.hypot(n.x - c.pos.x, n.z - c.pos.z); if (n.adj.length && d < bd) { bd = d; idx = i; } });
+    g.nodes.forEach((n, i) => { const d = Math.hypot(n.x - c.pos.x, n.z - c.pos.z); if (n.adj.length && d < bd && dry(n.x, n.z)) { bd = d; idx = i; } });
     c.pos.set(g.nodes[idx].x, 0, g.nodes[idx].z);
     const car = { path: [], s: 0, speed: 0, target: 18, node: idx, prevNode: -1, pos: c.pos.clone(), stopped: false, spin: 0 };
     const police = [{ s: -14, h: 0 }, { s: -28, h: 0 }];
     function extend() {
       while (car.path.length < 7) {
         const n = g.nodes[car.node];
-        let opts = n.adj.filter(([j]) => j !== car.prevNode); if (!opts.length) opts = n.adj;
+        let opts = n.adj.filter(([j]) => j !== car.prevNode && dry(g.nodes[j].x, g.nodes[j].z)); if (!opts.length) opts = n.adj.filter(([j]) => dry(g.nodes[j].x, g.nodes[j].z)); if (!opts.length) opts = n.adj;
         const [j] = opts[Math.floor(Math.random() * opts.length)];
         car.path.push([car.node, j]); car.prevNode = car.node; car.node = j;
       }

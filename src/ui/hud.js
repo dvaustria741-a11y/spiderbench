@@ -6,6 +6,9 @@ import { loadFonts } from './fonts.js';
 import { createReticle } from './reticle.js';
 
 const COL = { street: '#0a1648', block: '#95b4f5', blockHi: '#b4cbff', water: '#1b4f86', shore: '#5da6e6', park: '#2f63b0', sidewalk: '#16266a', bg: '#0c1c55' };
+const HUD_ART = (import.meta.env?.BASE_URL || '/') + 'assets/ui/hud/';
+const ART = {}; if (typeof Image !== 'undefined') for (const k of ['N', 'E', 'S', 'W', 'arrow', 'objective']) { const i = new Image(); i.src = HUD_ART + k + '.png'; ART[k] = i; }
+const artOK = k => ART[k] && ART[k].complete && ART[k].naturalWidth > 0;
 let PX_PER_M = 0.58;        // offscreen map resolution (lowered if the minimap canvas fails to allocate; see buildOffscreen)
 const VIEW_M = 260;        // meters visible across the minimap width
 
@@ -16,17 +19,13 @@ function css() {
   s.textContent = `
   #hud{position:fixed;inset:0;pointer-events:none;font-family:Rajdhani,'Barlow Condensed','Arial Narrow',sans-serif;color:#fff;z-index:10;transition:opacity .4s}
   #hud.hidden{opacity:0}
-  .mm-wrap{position:absolute;right:2.4vw;bottom:1.9vh;width:15.6vw;min-width:190px;perspective:700px}
-  .mm-wrap .mm{position:relative;transform:rotateY(-12deg) rotateX(6deg) skewY(-1.5deg);transform-origin:100% 100%}
-  .mm-compass{position:relative;height:2.1vw;min-height:26px;overflow:hidden;
-    background:linear-gradient(180deg,rgba(18,30,60,.55),rgba(18,30,60,.25));border-top:1px solid rgba(190,210,255,.55);
-    clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}
+  .mm-wrap{position:absolute;right:2.4vw;bottom:1.9vh;width:17vw;min-width:200px}
+  .mm-compass{position:relative;aspect-ratio:999/122;margin-bottom:-.6vw}
+  .mm-compass img,.mm-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;user-select:none}
   .mm-compass canvas{position:absolute;inset:0;width:100%;height:100%}
-  .mm-map{position:relative;margin-top:.25vw;aspect-ratio:1.78/1;border-radius:.35vw;overflow:hidden;
-    box-shadow:0 0 0 1px rgba(160,190,255,.35),0 4px 18px rgba(0,0,30,.35);background:${COL.bg}}
+  .mm-box{position:relative;aspect-ratio:1000/612}
+  .mm-map{position:absolute;left:2.8%;right:3%;top:4.5%;bottom:5%;overflow:hidden;background:${COL.bg}}
   .mm-map canvas{position:absolute;inset:0;width:100%;height:100%}
-  .mm-corner{position:absolute;width:10px;height:10px;border:1.5px solid rgba(220,230,255,.8)}
-  .mm-side{position:absolute;right:-6px;top:38%;width:3px;height:22%;background:#f39a2b;border-radius:2px;box-shadow:0 0 6px #f39a2b}
   .obj-ind{position:absolute;width:64px;height:64px;transform:translate(-50%,-50%);transition:opacity .3s}
   .obj-ind svg{width:100%;height:100%;overflow:visible}
   .help{position:absolute;left:2vw;bottom:3vh;font-size:15px;line-height:1.5;letter-spacing:.04em;
@@ -67,11 +66,8 @@ export function createHud({ player, world, camera }) {
   const root = document.getElementById('hud') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'hud' }));
   root.innerHTML = `
     <div class="mm-wrap"><div class="mm">
-      <div class="mm-compass"><canvas></canvas></div>
-      <div class="mm-map"><canvas></canvas></div>
-      <div class="mm-corner" style="left:-4px;top:-3px;border-right:none;border-bottom:none"></div>
-      <div class="mm-corner" style="right:-4px;bottom:-4px;border-left:none;border-top:none"></div>
-      <div class="mm-side"></div>
+      <div class="mm-compass"><img src="${HUD_ART}compass.png" draggable="false"><canvas></canvas></div>
+      <div class="mm-box"><div class="mm-map"><canvas></canvas></div><img class="mm-frame" src="${HUD_ART}mmframe.png" draggable="false"></div>
     </div></div>
     <div class="obj-ind"><svg viewBox="-32 -32 64 64">
       <g class="chev" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"><path d="M-17,-9 L-27,0 M-27,4 L-15,11"/></g>
@@ -170,26 +166,29 @@ export function createHud({ player, world, camera }) {
 
   function drawCompass(heading) {
     const [w, h] = resizeCanvas(compassC); const g = compassC.getContext('2d'); g.clearRect(0, 0, w, h);
+    const hb = h * 0.72; // the bar part of the strip (the pointer notch hangs below)
+    g.save(); g.beginPath(); g.rect(w * 0.075, 0, w * 0.85, hb); g.clip();
     const span = Math.PI * 0.9; // radians visible across strip
     const pxr = w / span;
     // heading: yaw where camera looks along (sin yaw, cos yaw) in xz. North = -Z.
     const bearing = Math.atan2(Math.sin(heading), -Math.cos(heading)); // 0 = north(-Z), +pi/2 = east(+X)
-    g.font = `700 ${Math.round(h * 0.52)}px Rajdhani, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `700 ${Math.round(hb * 0.52)}px Rajdhani, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let deg = -180; deg < 540; deg += 7.5) {
       const a = deg * Math.PI / 180; let d = a - bearing; d = Math.atan2(Math.sin(d), Math.cos(d));
       const x = w / 2 + d * pxr; if (x < -10 || x > w + 10) continue;
       if (deg % 90 === 0) {
         const L = ['N', 'E', 'S', 'W'][((deg / 90) % 4 + 4) % 4];
-        g.fillStyle = L === 'N' ? '#f39a2b' : '#fff'; g.fillText(L, x, h * 0.5);
+        if (artOK(L)) { const im = ART[L], lh = hb * 0.62, lw = lh * im.naturalWidth / im.naturalHeight; g.drawImage(im, x - lw / 2, hb * 0.5 - lh / 2, lw, lh); } else { g.fillStyle = L === 'N' ? '#e23b3b' : '#fff'; g.fillText(L, x, hb * 0.5); }
       } else {
         const big = deg % 22.5 === 0; g.fillStyle = 'rgba(235,240,255,.85)';
-        g.fillRect(x - 1, h * (big ? 0.34 : 0.42), 2, h * (big ? 0.32 : 0.18));
+        g.fillRect(x - 1, hb * (big ? 0.3 : 0.4), 2, hb * (big ? 0.4 : 0.2));
       }
     }
     // objective pip
     const p = player.position; const oa = Math.atan2(objective.x - p.x, -(objective.z - p.z));
     let d = oa - bearing; d = Math.atan2(Math.sin(d), Math.cos(d)); const x = THREE.MathUtils.clamp(w / 2 + d * pxr, 8, w - 8);
-    g.fillStyle = '#f5c02e'; g.beginPath(); g.moveTo(x, h * 0.72); g.lineTo(x + h * 0.18, h * 0.98); g.lineTo(x - h * 0.18, h * 0.98); g.closePath(); g.fill();
+    if (artOK('objective')) { const im = ART.objective, oh = hb * 0.7, ow = oh * im.naturalWidth / im.naturalHeight; g.drawImage(im, x - ow / 2, hb * 0.5 - oh / 2, ow, oh); }
+    g.restore();
   }
 
   function drawMap(heading) {
@@ -215,16 +214,13 @@ export function createHud({ player, world, camera }) {
       const dx = objective.x - p.x, dz = objective.z - p.z; const r = -(Math.PI - heading);
       let X = (dx * Math.cos(r) - dz * Math.sin(r)) * scale + cx, Y = (dx * Math.sin(r) + dz * Math.cos(r)) * scale + cy;
       X = THREE.MathUtils.clamp(X, 10, w - 10); Y = THREE.MathUtils.clamp(Y, 10, h - 10);
-      g.save(); g.translate(X, Y); g.strokeStyle = '#f5b82e'; g.lineWidth = 2.2; g.fillStyle = 'rgba(15,15,20,.8)';
-      g.beginPath(); g.moveTo(0, -9); g.lineTo(9, 0); g.lineTo(0, 9); g.lineTo(-9, 0); g.closePath(); g.fill(); g.stroke();
-      g.fillStyle = '#f5d34a'; g.beginPath(); g.arc(0, 0, 2.5, 0, 7); g.fill(); g.restore();
+      if (artOK('objective')) { const im = ART.objective, oh = h * 0.13, ow = oh * im.naturalWidth / im.naturalHeight; g.drawImage(im, X - ow / 2, Y - oh / 2, ow, oh); }
     }
     // player arrow (camera-up; rotate by player facing relative to camera)
     const vel = player.velocity; const face = Math.hypot(vel.x, vel.z) > 0.5 ? Math.atan2(vel.x, vel.z) : heading;
     g.save(); g.translate(cx, cy); g.rotate(-(face - heading));
-    const s = h * 0.075;
-    g.beginPath(); g.moveTo(0, -s * 1.35); g.lineTo(s * 1.0, s * 0.9); g.lineTo(0, s * 0.35); g.lineTo(-s * 1.0, s * 0.9); g.closePath();
-    g.fillStyle = '#f7c531'; g.fill(); g.lineWidth = Math.max(1.5, s * 0.22); g.strokeStyle = '#fff'; g.stroke();
+    if (artOK('arrow')) { const im = ART.arrow, ah = h * 0.17, aw = ah * im.naturalWidth / im.naturalHeight; g.drawImage(im, -aw / 2, -ah * 0.55, aw, ah); }
+    else { const s = h * 0.075; g.beginPath(); g.moveTo(0, -s * 1.35); g.lineTo(s, s * 0.9); g.lineTo(0, s * 0.35); g.lineTo(-s, s * 0.9); g.closePath(); g.fillStyle = '#e23b3b'; g.fill(); g.lineWidth = Math.max(1.5, s * 0.22); g.strokeStyle = '#fff'; g.stroke(); }
     g.restore();
     // vignette
     const vg = g.createLinearGradient(0, 0, 0, h); vg.addColorStop(0, 'rgba(0,0,40,.25)'); vg.addColorStop(0.2, 'rgba(0,0,40,0)'); vg.addColorStop(1, 'rgba(0,0,40,.15)');
