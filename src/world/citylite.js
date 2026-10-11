@@ -107,7 +107,7 @@ export async function buildCity({ scene, renderer }) {
   const SWIM_Y = -5.2, SEABED = SWIM_Y - 2.4; // water surface (was -1.6, -2.6, -3.4; lowered like Spider Fuser's far-below ocean) and the sea floor the shore slopes down to
   const SLOPE_RUN = 0.6; // shore slope: metres of run per metre of drop (0.6 = ~60 degrees, a steep stone embankment like Spider Fuser's)
   const waterU = { uWT: { value: 0 } };
-  const matWater = new THREE.MeshStandardMaterial({ color: 0x172737, roughness: 0.45, metalness: 0, envMapIntensity: 0.3 }); // deep dull navy like Spider Fuser (sky reflection was making it bright blue)
+  const matWater = new THREE.MeshStandardMaterial({ color: 0x121c26, roughness: 0.45, metalness: 0, envMapIntensity: 0.3 }); // deep dull navy like Spider Fuser (sky reflection was making it bright blue)
   matWater.onBeforeCompile = (sh) => {
     sh.uniforms.uWT = waterU.uWT; if (skin) sh.uniforms.uGT = { value: skin.ground.tex };
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
@@ -293,27 +293,33 @@ export async function buildCity({ scene, renderer }) {
   };
   wallLines('kerb', 0, CH, LY.KERB, 6);
 
-  // ---- edge strip along the sea wall (Spider Fuser look): just a flat, slightly darker concrete band painted on the walk a little
-  // in from the edge, like the groove / coping line at the top of Spider Fuser's wall. No height, no collision change.
-  const STRIP_A = 0.35, STRIP_B = 0.95;
+  // ---- coping lip along the sea wall (Spider Fuser style): FLUSH with the sidewalk (no step up), a band of lighter slab concrete along
+  // the edge that overhangs the slope a little, with a dark band on its front face that runs down to meet the slope. Collision stays
+  // flat over it (terrainHeight), so nothing to trip on and no floating.
+  const LIP_IN = 1.0, LIP_OUT = 0.3;
   const slabLines = (key) => {
     const [pb, lens] = LINES[key]; if (!lens.length) return;
-    const P = i16(pb), gb = new GB(); let o = 0; const y = CH + 0.012;
+    const P = i16(pb), gb = new GB(); let o = 0; const yT = CH + 0.02, yB = CH - LIP_OUT / SLOPE_RUN;
+    const emit = (pts, N, uvs, layer) => {
+      const a = pts[0], b = pts[1], c = pts[2], ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      const d = (uy * vz - uz * vy) * N[0] + (uz * vx - ux * vz) * N[1] + (ux * vy - uy * vx) * N[2];
+      for (const i of d >= 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]) { const q = pts[i]; gb.p.push(q[0], q[1], q[2]); gb.n.push(N[0], N[1], N[2]); if (TEX) { gb.u.push(layer, 0); gb.c.push(uvs[i][0], uvs[i][1], 0); } else { gb.u.push(99, 0); gb.c.push(C.lot[0], C.lot[1], C.lot[2]); } }
+    };
     for (const n of lens) {
       const v = [];
       for (let k = 0; k < n; k++) { const x = P[2 * (o + k)] / 16, z = P[2 * (o + k) + 1] / 16, l = v[v.length - 1]; if (!l) v.push([x, z, 0]); else { const L = Math.hypot(x - l[0], z - l[1]); if (L >= 0.05) v.push([x, z, l[2] + L]); } }
       o += n; if (v.length < 2) continue;
       const sn = []; for (let k = 0; k < v.length - 1; k++) { const dx = v[k + 1][0] - v[k][0], dz = v[k + 1][1] - v[k][1], L = Math.hypot(dx, dz); sn.push([dz / L, -dx / L]); }
       const mi = v.map((_, k) => { const a = sn[Math.max(0, k - 1)], b = sn[Math.min(sn.length - 1, k)]; let mx = a[0] + b[0], mz = a[1] + b[1]; const l = Math.hypot(mx, mz) || 1; mx /= l; mz /= l; const c = Math.max(0.4, mx * b[0] + mz * b[1]); return [mx / c, mz / c]; });
-      const at = (k, d) => [v[k][0] + mi[k][0] * d, y, v[k][1] + mi[k][1] * d];
+      const at = (k, d, y) => [v[k][0] + mi[k][0] * d, y, v[k][1] + mi[k][1] * d];
       for (let k = 0; k < v.length - 1; k++) {
-        const P4 = [at(k, -STRIP_B), at(k + 1, -STRIP_B), at(k + 1, -STRIP_A), at(k, -STRIP_A)], U4 = [[v[k][2] / 6, 0], [v[k + 1][2] / 6, 0], [v[k + 1][2] / 6, 0.1], [v[k][2] / 6, 0.1]];
-        const a = P4[0], b = P4[1], c = P4[2], d = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), e2 = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), f = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-        for (const i of e2 >= 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]) { const q = P4[i]; gb.p.push(q[0], q[1], q[2]); gb.n.push(0, 1, 0); if (TEX) { gb.u.push(LY.CONC, 0); gb.c.push(U4[i][0], U4[i][1], 0); } else { gb.u.push(99, 0); gb.c.push(C.lot[0], C.lot[1], C.lot[2]); } }
+        const A = k, B = k + 1, sa = v[A][2] / 6, sb = v[B][2] / 6, nn = [sn[k][0], 0, sn[k][1]];
+        emit([at(A, -LIP_IN, yT), at(B, -LIP_IN, yT), at(B, LIP_OUT, yT), at(A, LIP_OUT, yT)], [0, 1, 0], [[sa, -LIP_IN / 6], [sb, -LIP_IN / 6], [sb, LIP_OUT / 6], [sa, LIP_OUT / 6]], LY.CONC);
+        emit([at(A, LIP_OUT, yT), at(B, LIP_OUT, yT), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], nn, [[sa, 0], [sb, 0], [sb, 0.2], [sa, 0.2]], LY.ASPH);
       }
     }
     if (gb.empty) return;
-    const m = new THREE.Mesh(gb.build(), matPaint); m.receiveShadow = true; m.name = 'edgestrip-' + key; root.add(m);
+    const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = 'lip-' + key; root.add(m);
   };
 
   // no lane markings: the reference game uses plain asphalt (MARKS in openlayout.js still has the straight bands if they come back)
@@ -519,7 +525,7 @@ export async function buildCity({ scene, renderer }) {
     if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; if (Math.abs(x) >= 2600) return SEABED; const dz = Math.abs(z - e.z) - e.half; return dz < 0 ? 0 : slopeH(0, dz); }
     if (c >= CLS.AV && c <= CLS.INT) return 0;
     if (c !== CLS.OUT) return c === CLS.PARK ? parkTop(x, z) : CH;
-    return slopeH(CH, seaDist(x, z));
+    const sd = seaDist(x, z); return sd < LIP_OUT ? CH : slopeH(CH, sd); // flat under the lip overhang
   };
   const grid = new CollisionGrid(solids, 24);
   const finZ = zips.finalize(grid);

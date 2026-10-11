@@ -100,7 +100,7 @@ export const DAY_SUNS = { a: 'day', b: 'dayB', c: 'dayC' };
 // (open map) Spider Fuser look for the Open World map: soft, flat, hazy daylight. Much more sky/bounce fill and a gentler key than the
 // Manhattan 'day' (shade only slightly darker than lit ground, soft low-contrast shadows), a touch desaturated, cool haze.
 // sf / sfB / sfC replace day / dayB / dayC on the open map only (see resolvePreset); they are not listed in lighting.presets.
-const SF_LOOK = { vertFill: 0.85, vertBounce: 0.55, warm: 0.1, env: 1.75, envSpec: 0.55, envSat: 0.55, sun: 1.05, exposure: 0.92, clouds: 0.6, fog: 1.25, mie: 0.6, bounce: 0.6, groundBounce: 1.0, glow: 0.1, fogTint: [0.74, 0.8, 0.9] };
+const SF_LOOK = { vertFill: 0.85, vertBounce: 0.55, warm: 0.03, env: 1.75, envSpec: 0.55, envSat: 0.55, sun: 1.05, exposure: 0.92, clouds: 0.6, fog: 1.25, mie: 0.6, bounce: 0.6, groundBounce: 1.0, glow: 0.1, fogTint: [0.74, 0.8, 0.9] };
 PRESETS.sf = { elevation: 58, azimuth: 118, look: { ...SF_LOOK } };
 PRESETS.sfB = { elevation: 50, azimuth: 58, look: { ...SF_LOOK } };
 PRESETS.sfC = { elevation: 44, azimuth: 160, look: { ...SF_LOOK } };

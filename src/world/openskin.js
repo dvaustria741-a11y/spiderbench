@@ -55,14 +55,14 @@ export function skinGround(mat, skin) {
       float sl = smoothstep(0.9985, 0.991, vUpN);
       if (sl > 0.0) tc = mix(tc, texture(uGT, vec3(vColor.xy * 0.83 + 0.31, 8.0)).rgb, sl);
     }
-    if (L < 9.5 || L > 10.5) { // soft low-res photo-like mottling (not on water); +-14 % over ~10-40 m
-      float mv = vn(vColor.xy * 0.37) * 0.5 + vn(vColor.xy * 1.1 + 7.3) * 0.3 + vn(vColor.xy * 3.3 + 3.1) * 0.2;
-      tc *= 0.86 + 0.28 * mv;
+    if (L < 9.5 || L > 10.5) { // soft low-res photo-like mottling (not on water); +-5 % over ~10-40 m
+      float mv = vn(vColor.xy * 0.37) * 0.65 + vn(vColor.xy * 1.1 + 7.3) * 0.35;
+      tc *= 0.95 + 0.10 * mv;
     }
     diffuseColor.rgb = tc;
   }`);
   };
-  mat.customProgramCacheKey = () => 'openSkinGround4';
+  mat.customProgramCacheKey = () => 'openSkinGround5';
 }
 
 // roofs: every upward-facing face of the facade / glass materials; one of 4 roof types per 48 m cell
