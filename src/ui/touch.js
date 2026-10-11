@@ -29,7 +29,7 @@ export function initTouch(ctx) {
 #touch-ui .ring{position:absolute;inset:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.18)}
 #touch-ui .knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.28)}
 #touch-ui .look{position:absolute;pointer-events:auto;touch-action:none;left:38%;right:0;top:0;bottom:0}
-#touch-ui .menu{left:calc(14px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));width:46px;height:46px}`;
+#touch-ui .menu{left:calc(14px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));width:34px;height:34px}`;
   document.head.appendChild(css);
 
   const fire = (type, code) => {
