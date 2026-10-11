@@ -71,8 +71,10 @@ export function createAudio() {
       catch (e) { if (i === tries - 1) throw e; await new Promise(r => setTimeout(r, 400 * (i + 1))); }
     }
   }
+  let thwipBuf = null; // Zen's own thwip.mp3: the web-shot sound
   async function load() {
     try {
+      fetchBuf(BASE + 'thwip.mp3').then((b) => { thwipBuf = b; }).catch((e) => console.warn('[audio] thwip.mp3 missing:', e?.message || e));
       man = await (await fetch(BASE + 'manifest.json')).json();
       // small sprites first (UI / traversal are heard right away), then the loops, then the music stems
       await Promise.all(Object.entries(man.sprites).map(async ([k, s]) => { bufs[k] = await fetchBuf(s.url); }));
@@ -180,12 +182,18 @@ export function createAudio() {
   const sfx = {
     // --- web / traversal
     thwip(strength = 1, pan = 0) {
+      if (thwipBuf && ready) { // the user's thwip.mp3 (replaces the synthesised shot)
+        const src = ac.createBufferSource(); src.buffer = thwipBuf; src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.06;
+        const g = G(0.5 * clamp(strength, 0.4, 1.3)); let node = src.connect(g);
+        if (ac.createStereoPanner) { const pn = ac.createStereoPanner(); pn.pan.value = clamp(pan, -1, 1); node = node.connect(pn); }
+        node.connect(bus.sfx); src.start(); lastThwip = { v: { g }, t: now() }; return;
+      }
       const v = play('thwip', { gain: clamp(strength, 0.35, 1.3), pan: clamp(pan + (Math.random() - 0.5) * 0.2, -1, 1), rate: 1.04 - 0.06 * clamp(strength, 0, 1.3) });
       if (v) lastThwip = { v, t: now() };
     },
     zip() {
       if (lastThwip && now() - lastThwip.t < 0.06) { try { lastThwip.v.g.gain.setTargetAtTime(0, now(), 0.01); } catch { /* ended */ } }
-      lastThwip = null; play('zip');
+      lastThwip = null; if (thwipBuf && ready) { sfx.thwip(1.0); return; } play('zip');
     },
     attach(pan = 0) { play('attach', { pan }); },
     release(pan = 0) { play('release', { pan }); },

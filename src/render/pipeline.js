@@ -1159,7 +1159,7 @@ vec3 fxaaLite(vec2 uv, vec2 px) {
   vec2 t = vec2(-g.y, g.x) / gl * px;                // along the edge
   vec3 a = texture(uColor, uv + t * 0.75).rgb, b = texture(uColor, uv - t * 0.75).rgb;
   vec3 a2 = texture(uColor, uv + t * 1.75).rgb, b2 = texture(uColor, uv - t * 1.75).rgb;
-  return c0 * 0.30 + (a + b) * 0.2 + (a2 + b2) * 0.05 + (cn + cs + ce + cw) * 0.0;
+  return c0 * 0.375 + (a + b) * 0.25 + (a2 + b2) * 0.0625; // weights sum to 1: no darkening
 }
 void main() {
   vec2 d = vUv - 0.5;

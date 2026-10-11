@@ -291,14 +291,14 @@ export async function buildCity({ scene, renderer }) {
     }
     const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = 'walls-' + key; root.add(m);
   };
-  wallLines('kerb', 0, CH, LY.WALK, 6, CH * 1.6); // kerb = a small ramp in the sidewalk texture (no dark vertical slab line between road and sidewalk)
 
   // ---- sidewalk slab over the sea wall (Spider Fuser look, per Zen's sketch): the sidewalk just keeps going as a thin slab that overhangs the
   // top of the sloped wall; the slope starts under it. Sidewalk texture on every face (world-mapped like the sidewalk), flush top, flat collision.
   const LIP_OUT = 0.35, LIP_T = 0.3;
-  const slabLines = (key) => {
+  // sidewalk-textured ribbon along a smooth polyline (outside on the right): faces(A, B, at, nn, emit) adds the quads of one segment
+  const ribbon = (key, name, faces) => {
     const [pb, lens] = LINES[key]; if (!lens.length) return;
-    const P = i16(pb), gb = new GB(), f = W(SC[LY.WALK]); let o = 0; const yT = CH + 0.005, yB = CH - LIP_T;
+    const P = i16(pb), gb = new GB(), f = W(SC[LY.WALK]); let o = 0;
     const emit = (pts, N) => {
       const a = pts[0], b = pts[1], c = pts[2], ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
       const d = (uy * vz - uz * vy) * N[0] + (uz * vx - ux * vz) * N[1] + (ux * vy - uy * vx) * N[2];
@@ -311,16 +311,27 @@ export async function buildCity({ scene, renderer }) {
       const sn = []; for (let k = 0; k < v.length - 1; k++) { const dx = v[k + 1][0] - v[k][0], dz = v[k + 1][1] - v[k][1], L = Math.hypot(dx, dz); sn.push([dz / L, -dx / L]); }
       const mi = v.map((_, k) => { const a = sn[Math.max(0, k - 1)], b = sn[Math.min(sn.length - 1, k)]; let mx = a[0] + b[0], mz = a[1] + b[1]; const l = Math.hypot(mx, mz) || 1; mx /= l; mz /= l; const c = Math.max(0.4, mx * b[0] + mz * b[1]); return [mx / c, mz / c]; });
       const at = (k, d, y) => [v[k][0] + mi[k][0] * d, y, v[k][1] + mi[k][1] * d];
-      const dS = LIP_T * SLOPE_RUN; // where the slope surface is, at the slab's underside
-      for (let k = 0; k < v.length - 1; k++) {
-        const A = k, B = k + 1, nn = [sn[k][0], 0, sn[k][1]];
-        emit([at(A, -0.2, yT), at(B, -0.2, yT), at(B, LIP_OUT, yT), at(A, LIP_OUT, yT)], [0, 1, 0]);          // top (the sidewalk, extended)
-        emit([at(A, LIP_OUT, yT), at(B, LIP_OUT, yT), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], nn);            // front face
-        emit([at(A, dS, yB), at(B, dS, yB), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], [0, -1, 0]);              // underside of the overhang
-      }
+      for (let k = 0; k < v.length - 1; k++) faces(k, k + 1, at, [sn[k][0], 0, sn[k][1]], emit);
     }
     if (gb.empty) return;
-    const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = 'lip-' + key; root.add(m);
+    const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = name + key; root.add(m);
+  };
+  // sea wall (per Zen's sketch): the sidewalk keeps going as a thin slab that overhangs the top of the slope; the slope starts under it
+  const slabLines = (key) => {
+    const yT = CH + 0.005, yB = CH - LIP_T, dS = LIP_T * SLOPE_RUN; // dS: where the slope surface is at the slab underside
+    ribbon(key, 'lip-', (A, B, at, nn, emit) => {
+      emit([at(A, -0.2, yT), at(B, -0.2, yT), at(B, LIP_OUT, yT), at(A, LIP_OUT, yT)], [0, 1, 0]);      // top (the sidewalk, extended)
+      emit([at(A, LIP_OUT, yT), at(B, LIP_OUT, yT), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], nn);        // front face
+      emit([at(A, dS, yB), at(B, dS, yB), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], [0, -1, 0]);          // underside of the overhang
+    });
+  };
+  // road kerb: the kerb line lies ~0.5 m outside the sidewalk mesh edge. The sidewalk simply extends out to it and eases down to the road
+  // level inside that footprint (no wall, no ramp over the asphalt), so there is no gap, no dark line and no double strip.
+  const kerbLines = (key) => {
+    ribbon(key, 'kerb-', (A, B, at, nn, emit) => {
+      emit([at(A, -0.9, CH + 0.004), at(B, -0.9, CH + 0.004), at(B, -0.3, CH + 0.004), at(A, -0.3, CH + 0.004)], [0, 1, 0]);
+      emit([at(A, -0.3, CH + 0.004), at(B, -0.3, CH + 0.004), at(B, 0.0, 0.01), at(A, 0.0, 0.01)], [nn[0] * 0.45, 0.89, nn[2] * 0.45]);
+    });
   };
 
   // no lane markings: the reference game uses plain asphalt (MARKS in openlayout.js still has the straight bands if they come back)
@@ -331,7 +342,7 @@ export async function buildCity({ scene, renderer }) {
     const wm = new THREE.Mesh(new THREE.PlaneGeometry(18000, 18000).rotateX(-Math.PI / 2), matWater);
     wm.position.y = SWIM_Y; wm.frustumCulled = false; wm.receiveShadow = true; wm.name = 'water'; root.add(wm);
     wallLines('sea', y0, y1, LY.KERB, 3, (y1 - y0) * SLOPE_RUN); // sloped shore instead of a vertical sea wall
-    slabLines('sea'); // concrete coping slab on top of it
+    kerbLines('kerb'); slabLines('sea'); // concrete coping slab on top of it
     const rx0 = X0, rx1 = X0 + NX * CELL;
     for (const [a, b, e] of [[rx0 - 1500, rx0, EXITS.W], [rx1, rx1 + 1500, EXITS.E]]) for (let x = a; x < b; x += 300) {
       const xa = x, xb = Math.min(b, x + 300), zN = e.z - e.half, zS = e.z + e.half, gb = chunkOf((xa + xb) / 2, e.z).gnd;
