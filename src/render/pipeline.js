@@ -1081,7 +1081,7 @@ void main() {
       uStreakSrc: { value: null }, uStreakLo: { value: null }, uStreak: { value: 0 }, uStreakT: { value: 2.5 }, // (night) anamorphic lamp streaks
       uExposure: { value: 1 }, uBloomStr: { value: 0.04 }, uSat: { value: 1 }, uContrast: { value: 1 },
       uLift: { value: grade.lift }, uGamma: { value: grade.gamma }, uGain: { value: grade.gain }, uWB: { value: grade.whiteBalance },
-      uVignette: { value: 0.3 }, uCA: { value: 0.001 }, uSharpen: { value: 0.3 }, uGrain: { value: 0 }, uFrame: { value: 0 },
+      uVignette: { value: 0.3 }, uCA: { value: 0.001 }, uSharpen: { value: 0.3 }, uFxaa: { value: 0 }, uGrain: { value: 0 }, uFrame: { value: 0 },
       uAspect: { value: 1 },
       uSunVis: { value: sunVisRT.texture }, uSunUv: { value: new THREE.Vector2() }, uFlare: { value: 0 },
       uSunCol: { value: new THREE.Vector3() }, uPivot: { value: 0.18 }, uSatKnee: { value: 0.72 },
@@ -1094,7 +1094,7 @@ void main() {
 precision highp float; in vec2 vUv; out vec4 fragColor;
 uniform sampler2D uColor, uBloom; uniform vec2 uPx;
 uniform sampler2D uStreakSrc, uStreakLo; uniform float uStreak, uStreakT; // (night)
-uniform float uExposure, uBloomStr, uSat, uContrast, uVignette, uCA, uSharpen, uGrain, uFrame, uAspect;
+uniform float uExposure, uBloomStr, uSat, uContrast, uVignette, uCA, uSharpen, uGrain, uFrame, uAspect, uFxaa;
 uniform vec3 uLift, uGamma, uGain, uWB; uniform float uPivot, uSatKnee;
 uniform sampler2D uSunVis; uniform vec2 uSunUv; uniform float uFlare; uniform vec3 uSunCol;
 uniform sampler2D uAE; uniform float uAEOn, uAEKey, uAEStr, uAERange;
@@ -1146,13 +1146,28 @@ vec3 aces(vec3 c) { c = ACESIn * c; vec3 r = RRTAndODTFit(c); vec3 l = c * uToe;
   return clamp(ACESOut * r, 0.0, 1.0); }
 vec3 tmS(vec3 c) { return c / (1.0 + luma(c)); }
 vec3 itmS(vec3 c) { return c / max(1.0 - luma(c), 1e-4); }
+// (open map r5) cheap edge smoothing when AA is Off (Low): along-the-edge 3-tap blend on luma edges, only where there is a real edge
+vec3 fxaaLite(vec2 uv, vec2 px) {
+  vec3 c0 = texture(uColor, uv).rgb;
+  vec3 cn = texture(uColor, uv + vec2(0.0, px.y)).rgb, cs = texture(uColor, uv - vec2(0.0, px.y)).rgb;
+  vec3 ce = texture(uColor, uv + vec2(px.x, 0.0)).rgb, cw = texture(uColor, uv - vec2(px.x, 0.0)).rgb;
+  float l0 = luma(tmS(c0)), ln = luma(tmS(cn)), ls = luma(tmS(cs)), le = luma(tmS(ce)), lw = luma(tmS(cw));
+  float mx = max(l0, max(max(ln, ls), max(le, lw))), mn = min(l0, min(min(ln, ls), min(le, lw)));
+  float rng = mx - mn;
+  if (rng < max(0.04, mx * 0.12)) return c0;
+  vec2 g = vec2(le - lw, ln - ls); float gl = length(g); if (gl < 1e-5) return c0;
+  vec2 t = vec2(-g.y, g.x) / gl * px;                // along the edge
+  vec3 a = texture(uColor, uv + t * 0.75).rgb, b = texture(uColor, uv - t * 0.75).rgb;
+  vec3 a2 = texture(uColor, uv + t * 1.75).rgb, b2 = texture(uColor, uv - t * 1.75).rgb;
+  return c0 * 0.30 + (a + b) * 0.2 + (a2 + b2) * 0.05 + (cn + cs + ce + cw) * 0.0;
+}
 void main() {
   vec2 d = vUv - 0.5;
 #ifdef FAST
-  vec3 c = texture(uColor, vUv).rgb; // (fast post) one fetch: no sharpen / CA / depth read
+  vec3 c = uFxaa > 0.5 ? fxaaLite(vUv, uPx) : texture(uColor, vUv).rgb; // (fast post) no sharpen / CA / depth read
 #else
   // sharpen (in a compressed domain to avoid halos on HDR edges)
-  vec3 c0 = tmS(texture(uColor, vUv).rgb);
+  vec3 c0 = tmS(uFxaa > 0.5 ? fxaaLite(vUv, uPx) : texture(uColor, vUv).rgb);
   vec3 n = tmS(texture(uColor, vUv + vec2(0.0, uPx.y)).rgb), s = tmS(texture(uColor, vUv - vec2(0.0, uPx.y)).rgb);
   vec3 e = tmS(texture(uColor, vUv + vec2(uPx.x, 0.0)).rgb), w = tmS(texture(uColor, vUv - vec2(uPx.x, 0.0)).rgb);
   // luma-only adaptive sharpen (no chroma fringes / colour noise), weaker with distance (TAA already resolves far detail)
@@ -1646,7 +1661,7 @@ void main() { vec4 t = texture(uSrc, vUv); vec3 c = uMode > 0.5 ? vec3(t.a - 1.0
       u.uFlare.value = lens.onScreen ? grade.flare * (lighting.tod.sunK ?? 1) : 0; // (daynight) no sun flare once the sun has set u.uSunUv.value.copy(lens.sunUv);
       u.uSunCol.value.copy(sky.skyUniforms.uSunColor.value);
       u.uContrast.value = grade.contrast; u.uPivot.value = grade.pivot; u.uSatKnee.value = grade.satKnee; u.uVignette.value = grade.vignette; u.uCA.value = grade.ca;
-      u.uSharpen.value = grade.sharpen; u.uGrain.value = grade.grain; u.uFrame.value = frame % 36000; // (lighting2 r3) long period: rain streak clock
+      u.uFxaa.value = Q.taa ? 0 : 1; u.uSharpen.value = grade.sharpen; u.uGrain.value = grade.grain; u.uFrame.value = frame % 36000; // (lighting2 r3) long period: rain streak clock
       u.uAspect.value = W / H;
       u.uProjInvS.value.copy(cam.projectionMatrixInverse);
       u.uAE.value = aeRT[aeIdx].texture; u.uAEOn.value = grade.autoExposure ? 1 : 0;
