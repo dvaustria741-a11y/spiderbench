@@ -83,6 +83,7 @@ export function createTravel(sys) {
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
   // ---------------------------------------------------------------- minimap overlay
+  const ARROW = new Image(); ARROW.src = '/assets/ui/hud/arrow.png';
   let mmCanvas = null, lastMM = -1;
   function minimap(pinsWorld) {
     if (!flow.isPlaying) return;
@@ -117,9 +118,8 @@ export function createTravel(sys) {
     {
       const vel = player.velocity; const face = Math.hypot(vel.x, vel.z) > 0.5 ? Math.atan2(vel.x, vel.z) : heading;
       g.save(); g.translate(cx, cy); g.rotate(-(face - heading));
-      const s = h * 0.075;
-      g.beginPath(); g.moveTo(0, -s * 1.35); g.lineTo(s * 1.0, s * 0.9); g.lineTo(0, s * 0.35); g.lineTo(-s * 1.0, s * 0.9); g.closePath();
-      g.shadowColor = 'rgba(0,0,30,.6)'; g.shadowBlur = 4; g.fillStyle = '#f7c531'; g.fill(); g.lineWidth = Math.max(1.5, s * 0.22); g.strokeStyle = '#fff'; g.stroke();
+      if (ARROW.complete && ARROW.naturalWidth) { const ah = h * 0.17, aw = ah * ARROW.naturalWidth / ARROW.naturalHeight; g.drawImage(ARROW, -aw / 2, -ah * 0.55, aw, ah); }
+      else { const s = h * 0.075; g.beginPath(); g.moveTo(0, -s * 1.35); g.lineTo(s, s * 0.9); g.lineTo(0, s * 0.35); g.lineTo(-s, s * 0.9); g.closePath(); g.fillStyle = '#e23b3b'; g.fill(); g.lineWidth = Math.max(1.5, s * 0.22); g.strokeStyle = '#fff'; g.stroke(); }
       g.restore();
     }
     // GPS distance readout

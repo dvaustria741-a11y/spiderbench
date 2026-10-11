@@ -25,7 +25,8 @@ function css() {
   .mm-compass img,.mm-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;user-select:none}
   .mm-compass canvas{position:absolute;inset:0;width:100%;height:100%}
   .mm-box{position:relative;aspect-ratio:1000/612}
-  .mm-map{position:absolute;left:2.8%;right:3%;top:4.5%;bottom:5%;overflow:hidden;background:${COL.bg}}
+  .mm-map{position:absolute;left:2.8%;right:3%;top:4.5%;bottom:5%;overflow:hidden;background:${COL.bg};
+    clip-path:polygon(7.1% 1.2%,97.2% 1.2%,99% 5.9%,99% 93.8%,95.8% 100%,25.9% 100%,21.7% 90.6%,6.1% 90.6%,.7% 82%,.7% 9.3%)}
   .mm-map canvas{position:absolute;inset:0;width:100%;height:100%}
   .obj-ind{position:absolute;width:64px;height:64px;transform:translate(-50%,-50%);transition:opacity .3s}
   .obj-ind svg{width:100%;height:100%;overflow:visible}
@@ -163,7 +164,7 @@ export function createHud({ player, world, camera }) {
   // moves every frame)
   const rects = new Map(); let rectGen = 0; addEventListener('resize', () => rectGen++);
   const rectOf = c => { let e = rects.get(c); if (!e || e.gen !== rectGen || ++e.n >= 30) rects.set(c, e = { r: c.getBoundingClientRect(), gen: rectGen, n: 0 }); return e.r; };
-  function resizeCanvas(c) { const r = rectOf(c); const dpr = Math.min(2, devicePixelRatio); const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } return [w, h]; }
+  function resizeCanvas(c) { const r = rectOf(c); const dpr = Math.min(1.5, devicePixelRatio); const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } return [w, h]; }
 
   function drawCompass(heading) {
     const [w, h] = resizeCanvas(compassC); const g = compassC.getContext('2d'); g.clearRect(0, 0, w, h);
@@ -249,7 +250,7 @@ export function createHud({ player, world, camera }) {
   }
 
   let visible = true, t = 0;
-  let mmT = 1, mmFrame = 0;
+  let mmT = 1, mmFrame = 0, cmpT = 1;
   return {
     setVisible(b) { visible = b; root.classList.toggle('hidden', !b); },
     setObjective(v) { if (v) objective = v.clone(); },
@@ -262,8 +263,8 @@ export function createHud({ player, world, camera }) {
       if (!visible) return;
       helpT += dt; help.style.opacity = helpOn && (helpManual || helpT < 30) ? 1 : 0;
       const cd = camera.getWorldDirection(_hd); const heading = Math.atan2(cd.x, cd.z);
-      drawCompass(heading); drawIndicator();
-      mmT += dt; if (mmT >= 1 / 30) { mmT = 0; drawMap(heading); mmFrame++; } // minimap at 30 Hz (systems overlay follows mmFrame)
+      cmpT += dt; if (cmpT >= 1 / 30) { cmpT = 0; drawCompass(heading); } drawIndicator();
+      mmT += dt; if (mmT >= 1 / 20) { mmT = 0; drawMap(heading); mmFrame++; } // minimap at 30 Hz (systems overlay follows mmFrame)
       if (debug) { const p = player.position, v = player.velocity; dbg.textContent = `${player.mode} pos ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}  v ${v.length().toFixed(1)} m/s`; }
     },
   };
