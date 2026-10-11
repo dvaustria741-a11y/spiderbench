@@ -104,10 +104,10 @@ export async function buildCity({ scene, renderer }) {
   skinGround(matGround, skin); skinGround(matPaint, skin);
 
   // open water: one big plane with low animated waves (normal-only, so it stays cheap). The player can swim in it (world.swimY).
-  const SWIM_Y = -2.6, SEABED = SWIM_Y - 2.4; // water surface (was -1.6: lowered 1 m) and the sea floor the shore slopes down to
+  const SWIM_Y = -3.4, SEABED = SWIM_Y - 2.4; // water surface (was -1.6, then -2.6) and the sea floor the shore slopes down to
   const SLOPE_RUN = 1.4; // shore slope: metres of run per metre of drop (1.4 = ~35 degrees, like Spider Fuser's embankments)
   const waterU = { uWT: { value: 0 } };
-  const matWater = new THREE.MeshStandardMaterial({ color: 0x2f5870, roughness: 0.16, metalness: 0 });
+  const matWater = new THREE.MeshStandardMaterial({ color: 0x213f58, roughness: 0.16, metalness: 0 });
   matWater.onBeforeCompile = (sh) => {
     sh.uniforms.uWT = waterU.uWT; if (skin) sh.uniforms.uGT = { value: skin.ground.tex };
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
@@ -217,13 +217,13 @@ export async function buildCity({ scene, renderer }) {
   meshLayer('park', LY.GRASS, CH + 0.02);
   // ---- rolling park ground (Spider Fuser style mounds): a raster-aligned heightfield over the park cells, always >= the flat park layer, fading
   // to flat toward the park edge so it meets the sidewalk. The same heights drive collision (terrainHeight) and where the trees stand.
-  const PARK_Y = CH + 0.02, HILL_LIFT = 0.03, HILL_A = 6.0, HILL_FADE = 18;
+  const PARK_Y = CH + 0.02, HILL_LIFT = 0.03, HILL_A = 2.0, HILL_FADE = 18;
   const vnoise = (x, z) => {
     const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz, sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
     const a = hash2(ix, iz), b = hash2(ix + 1, iz), c = hash2(ix, iz + 1), d = hash2(ix + 1, iz + 1);
     return (a + (b - a) * sx) * (1 - sz) + (c + (d - c) * sx) * sz;
   };
-  const hillRaw = (x, z) => 0.40 * vnoise(x / 30 + 3.1, z / 30 + 7.7) + 0.35 * vnoise(x / 14 + 11.3, z / 14 + 2.9) + 0.25 * vnoise(x / 7 + 5.5, z / 7 + 13.1);
+  const hillRaw = (x, z) => 0.45 * vnoise(x / 22 + 3.1, z / 22 + 7.7) + 0.35 * vnoise(x / 11 + 11.3, z / 11 + 2.9) + 0.20 * vnoise(x / 6 + 5.5, z / 6 + 13.1);
   const HILLW = NX + 1, HILLV = new Float32Array(HILLW * (NZ + 1));
   { // distance (m) from every park cell to the nearest non-park cell: two-pass chamfer
     const D = new Float32Array(NX * NZ), BIG = 1e6, d1 = CELL, d2 = CELL * Math.SQRT2;

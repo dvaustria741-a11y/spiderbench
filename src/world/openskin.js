@@ -52,7 +52,7 @@ export function skinGround(mat, skin) {
     float L = floor(vSurf + 0.5);
     vec3 tc = texture(uGT, vec3(vColor.xy, L)).rgb;
     if (L > 6.5 && L < 7.5) { // grass: steep slopes of the park mounds wear through to dirt
-      float sl = smoothstep(0.995, 0.96, vUpN);
+      float sl = smoothstep(0.9985, 0.991, vUpN);
       if (sl > 0.0) tc = mix(tc, texture(uGT, vec3(vColor.xy * 0.83 + 0.31, 8.0)).rgb, sl);
     }
     diffuseColor.rgb = tc;
