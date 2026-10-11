@@ -549,9 +549,9 @@ export async function buildCity({ scene, renderer }) {
     const c = cellAt(x, z);
     if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; if (Math.abs(x) >= 2600) return SEABED; const dz = Math.abs(z - e.z) - e.half; return dz < 0 ? 0 : slopeH(0, dz); }
     if (c >= CLS.AV && c <= CLS.INT) return 0;
-    const sd = seaSigned(x, z);
-    if (c !== CLS.OUT) return sd > LIP_OUT ? slopeH(CH, sd) : c === CLS.PARK ? parkTop(x, z) : CH; // land cell that lies outside the sea line follows the visible slope
-    return sd < LIP_OUT ? CH : slopeH(CH, sd); // OUT cell inside the line (raster is coarse) or under the lip overhang stays flat
+    if (c !== CLS.OUT) return c === CLS.PARK ? parkTop(x, z) : CH; // land is land (no sea-distance lookup: that was sending every sidewalk to the sea floor)
+    const sd = seaSigned(x, z); // OUT cell: inside the sea line (the raster is coarse) or under the lip overhang stays flat, outside follows the slope
+    return sd < LIP_OUT ? CH : slopeH(CH, sd);
   };
   const grid = new CollisionGrid(solids, 24);
   const finZ = zips.finalize(grid);
