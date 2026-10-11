@@ -105,7 +105,7 @@ export async function buildCity({ scene, renderer }) {
 
   // open water: one big plane with low animated waves (normal-only, so it stays cheap). The player can swim in it (world.swimY).
   const SWIM_Y = -3.4, SEABED = SWIM_Y - 2.4; // water surface (was -1.6, then -2.6) and the sea floor the shore slopes down to
-  const SLOPE_RUN = 1.4; // shore slope: metres of run per metre of drop (1.4 = ~35 degrees, like Spider Fuser's embankments)
+  const SLOPE_RUN = 0.6; // shore slope: metres of run per metre of drop (0.6 = ~60 degrees, a steep stone embankment like Spider Fuser's)
   const waterU = { uWT: { value: 0 } };
   const matWater = new THREE.MeshStandardMaterial({ color: 0x213f58, roughness: 0.16, metalness: 0 });
   matWater.onBeforeCompile = (sh) => {
