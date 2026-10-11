@@ -188,6 +188,7 @@ export function createPhoto(sys) {
     // tether to the player + stay above ground
     const c = player.position; const off = _mv.copy(state.pos).sub(c); if (off.length() > TETHER) state.pos.copy(c).add(off.setLength(TETHER));
     const gy = world.groundHeight(state.pos.x, state.pos.z, state.pos.y) + 0.25; if (state.pos.y < gy) state.pos.y = gy;
+    if (world.swimY != null) { const wy = world.swimY + 0.5; if (state.pos.y < wy) state.pos.y = wy; } // open map: photo camera stays above the water too
     camera.position.copy(state.pos);
     _e.set(state.pitch, state.yaw, THREE.MathUtils.degToRad(state.roll)); camera.quaternion.setFromEuler(_e);
     if (camera.fov !== state.fov) { camera.fov = state.fov; camera.updateProjectionMatrix(); }

@@ -476,6 +476,7 @@ export function initCombat(ctx) {
       c.camDbg = [+Lc.toFixed(2), +raw.toFixed(2), +hard.toFixed(2), +c.camAllow.toFixed(2)];
       if (c.camAllow < Lc) { wantP.copy(pivot).addScaledVector(toCam, c.camAllow); wantP.y += (Lc - c.camAllow) * 0.3; }
       const gy = ctx.world.groundHeight(wantP.x, wantP.z, wantP.y + 0.3) + 0.35; if (wantP.y < gy) wantP.y = gy;
+      if (ctx.world.swimY != null) { const wy = ctx.world.swimY + 0.5; if (wantP.y < wy) wantP.y = wy; } // open map: never under the water
       cam.position.copy(wantP);
       const pc2 = P.cam;
       // pitch: an occlusion dodge (building / tree beside him) can leave the orbit near top-down, and standing and
