@@ -101,7 +101,8 @@ export async function buildCity({ scene, renderer }) {
   const matGround = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
   const matPaint = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 
-  skinGround(matGround, skin); skinGround(matPaint, skin);
+  const matLip = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }); // sea slab / kerb ribbons
+  skinGround(matGround, skin); skinGround(matPaint, skin); skinGround(matLip, skin);
 
   // open water: one big plane with low animated waves (normal-only, so it stays cheap). The player can swim in it (world.swimY).
   const SWIM_Y = -5.2, SEABED = SWIM_Y - 2.4; // water surface (was -1.6, -2.6, -3.4; lowered like Spider Fuser's far-below ocean) and the sea floor the shore slopes down to
@@ -315,11 +316,11 @@ export async function buildCity({ scene, renderer }) {
       for (let k = 0; k < v.length - 1; k++) faces(k, k + 1, at, [sn[k][0], 0, sn[k][1]], emit);
     }
     if (gb.empty) return;
-    const m = new THREE.Mesh(gb.build(), matGround); m.receiveShadow = true; m.name = name + key; root.add(m);
+    const m = new THREE.Mesh(gb.build(), matLip); m.receiveShadow = true; m.name = name + key; root.add(m);
   };
   // sea wall (per Zen's sketch): the sidewalk keeps going as a thin slab that overhangs the top of the slope; the slope starts under it
   const slabLines = (key) => {
-    const yT = CH + 0.005, yB = CH - LIP_T, dS = LIP_T * SLOPE_RUN; // dS: where the slope surface is at the slab underside
+    const yT = CH, yB = CH - LIP_T, dS = LIP_T * SLOPE_RUN; // dS: where the slope surface is at the slab underside
     ribbon(key, 'lip-', (A, B, at, nn, emit) => {
       emit([at(A, -1.2, yT), at(B, -1.2, yT), at(B, LIP_OUT, yT), at(A, LIP_OUT, yT)], [0, 1, 0]);      // top (the sidewalk, extended)
       emit([at(A, LIP_OUT, yT), at(B, LIP_OUT, yT), at(B, LIP_OUT, yB), at(A, LIP_OUT, yB)], nn);        // front face
@@ -330,9 +331,9 @@ export async function buildCity({ scene, renderer }) {
   // level inside that footprint (no wall, no ramp over the asphalt), so there is no gap, no dark line and no double strip.
   const kerbLines = (key) => {
     ribbon(key, 'kerb-', (A, B, at, nn, emit) => {
-      emit([at(A, -1.2, CH + 0.004), at(B, -1.2, CH + 0.004), at(B, -0.3, CH + 0.004), at(A, -0.3, CH + 0.004)], [0, 1, 0]);              // sidewalk, extended out over the hole
-      emit([at(A, -0.3, CH + 0.004), at(B, -0.3, CH + 0.004), at(B, 0.0, 0.006), at(A, 0.0, 0.006)], [nn[0] * 0.45, 0.89, nn[2] * 0.45]);     // eases down to the road
-      emit([at(A, 0.0, 0.006), at(B, 0.0, 0.006), at(B, 1.3, 0.006), at(A, 1.3, 0.006)], [0, 1, 0], LY.ASPH);                                 // road, extended in to meet the asphalt mesh
+      emit([at(A, -1.2, CH), at(B, -1.2, CH), at(B, -0.3, CH), at(A, -0.3, CH)], [0, 1, 0]);              // sidewalk, extended out over the hole
+      emit([at(A, -0.3, CH), at(B, -0.3, CH), at(B, 0.0, 0.0), at(A, 0.0, 0.0)], [nn[0] * 0.45, 0.89, nn[2] * 0.45]);     // eases down to the road
+      emit([at(A, 0.0, 0.0), at(B, 0.0, 0.0), at(B, 1.3, 0.0), at(A, 1.3, 0.0)], [0, 1, 0], LY.ASPH);                                 // road, extended in to meet the asphalt mesh
     });
   };
 
@@ -533,13 +534,24 @@ export async function buildCity({ scene, renderer }) {
     }
     return best;
   };
+  const seaSigned = (x, z) => { // signed distance to the sea line: > 0 outside (water side), < 0 inside (land side)
+    const l = SEA.map.get(SEA.key(Math.floor(x / SEA.HC), Math.floor(z / SEA.HC))); if (!l) return Infinity;
+    let best = Infinity, sg = 1;
+    for (const [ax, az, bx, bz] of l) {
+      const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz, t = L2 > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)) : 0;
+      const px = x - (ax + t * dx), pz = z - (az + t * dz), d = Math.hypot(px, pz);
+      if (d < best) { best = d; sg = (px * dz - pz * dx) >= 0 ? 1 : -1; } // n = (dz, -dx)/L is the outside normal
+    }
+    return best * sg;
+  };
   const slopeH = (top, d) => d >= (top - SEABED) * SLOPE_RUN ? SEABED : top - d / SLOPE_RUN;
   const terrainHeight = (x, z) => {
     const c = cellAt(x, z);
     if (c < 0) { const e = x < X0 ? EXITS.W : EXITS.E; if (Math.abs(x) >= 2600) return SEABED; const dz = Math.abs(z - e.z) - e.half; return dz < 0 ? 0 : slopeH(0, dz); }
     if (c >= CLS.AV && c <= CLS.INT) return 0;
-    if (c !== CLS.OUT) return c === CLS.PARK ? parkTop(x, z) : CH;
-    const sd = seaDist(x, z); return sd < LIP_OUT ? CH : slopeH(CH, sd); // flat under the lip overhang
+    const sd = seaSigned(x, z);
+    if (c !== CLS.OUT) return sd > LIP_OUT ? slopeH(CH, sd) : c === CLS.PARK ? parkTop(x, z) : CH; // land cell that lies outside the sea line follows the visible slope
+    return sd < LIP_OUT ? CH : slopeH(CH, sd); // OUT cell inside the line (raster is coarse) or under the lip overhang stays flat
   };
   const grid = new CollisionGrid(solids, 24);
   const finZ = zips.finalize(grid);
