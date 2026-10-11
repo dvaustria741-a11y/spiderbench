@@ -132,6 +132,7 @@ export class Animator {
     const hs = this.speedH;
     switch (mode) {
       case 'ground': case 'combat':
+        if (sub === 'swim' && this.clips.has('swimIdle') && this.clips.has('swimFwd')) return 'swim';
         if (sub === 'slingshot') return 'slingshot';
         if (sub === 'jumpCharge') return 'jumpCharge';
         if (sub === 'jumpLaunch') return 'jumpLaunch';
@@ -2590,6 +2591,20 @@ function makeNodes(S) {
     },
 
     // ---- landings
+    // ---- swimming: treading water (swimIdle) <-> front crawl (swimFwd), blended by speed; clips are in-place, the surface is y = 0.95 above the feet
+    swim: {
+      enter(L) { L.data.ti = 0; L.data.tf = 0; L.data.v = S.speedH; },
+      eval(L, A, out) {
+        const D = L.data; D.v = damp(D.v ?? S.speedH, S.speedH, 6, S.dt);
+        const wf = smooth((D.v - 0.4) / 1.6);
+        D.ti += S.dt; D.tf += S.dt * lerp(0.85, 1.4, clamp(D.v / 6.5, 0, 1));
+        if (wf < 0.999) C.sample('swimIdle', D.ti, S.P.idle);
+        if (wf > 0.001) C.sample('swimFwd', D.tf, S.P.fi);
+        if (wf <= 0.001) out.copy(S.P.idle); else if (wf >= 0.999) out.copy(S.P.fi);
+        else blendPoses(S.P.idle, S.P.fi, wf, out, null, S.bm(21 + L.key));
+        L.data.clip = wf > 0.5 ? 'swimFwd' : 'swimIdle';
+      },
+    },
     land: {
       enter(L, A) {
         const sub = A.sub || '';

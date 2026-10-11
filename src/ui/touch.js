@@ -6,14 +6,14 @@ const BASE = (import.meta.env?.BASE_URL || '/') + 'assets/ui/touch/';
 const SA = (side, v, edge) => `calc(${v}px + env(safe-area-inset-${edge}))`;
 // icon, key/mouse code, size px, right offset, bottom offset (px, from the safe area)
 const BUTTONS = [
-  ['swing',   'MouseRight', 104,  22, 118],
-  ['jump',    'Space',      112, 136,  18],
+  ['swing',   'MouseRight',  92,  22, 102],
+  ['jump',    'Space',      108, 136,  18],
   ['zip',     'KeyE',        80,  22,  18],
   ['wallrun', 'ShiftLeft',   84, 262,  20],
-  ['dive',    'KeyC',        72, 150, 136],
-  ['boost',   'KeyQ',        76, 236, 118],
-  ['punch',   'MouseLeft',   84,  22, 232],
-  ['web',     'KeyF',        72, 120, 244],
+  ['dive',    'KeyC',        66, 150, 130],
+  ['boost',   'KeyQ',        72, 236, 118],
+  ['punch',   'MouseLeft',   72,  22, 198],
+  ['web',     'KeyF',        64, 112, 200],
 ];
 
 export function initTouch(ctx) {

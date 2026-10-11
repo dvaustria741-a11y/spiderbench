@@ -62,7 +62,7 @@ export function createInput(el) {
   const prev = {};
   const state = {
     move: { x: 0, y: 0 }, look: { dx: 0, dy: 0 }, usingPad: false,
-    swing: false, jump: false, zip: false, sprint: false, walk: false, drop: false, quick: false, rope: false, jumpHeld: 0, aimT: 99,
+    swing: false, jump: false, zip: false, sprint: false, walk: false, touchMove: false, drop: false, quick: false, rope: false, jumpHeld: 0, aimT: 99,
   };
   const dz = v => (Math.abs(v) < 0.15 ? 0 : (v - Math.sign(v) * 0.15) / 0.85);
   const has = c => keys.has(c) || synthetic.has(c) || tapped.has(c);
@@ -105,7 +105,8 @@ export function createInput(el) {
     }
     tapped.clear();
     const len = Math.hypot(mx, my); if (len > 1) { mx /= len; my /= len; }
-    Object.assign(state, { move: { x: mx, y: my }, look: { dx: lx, dy: ly }, swing, jump, zip, drop, sprint, walk, quick, rope, usingPad, ctrl, slingL, slingR });
+    const touchMove = Math.hypot(touch.mx, touch.my) > 0.05; // on-screen stick in use: running needs the sprint button
+    Object.assign(state, { touchMove, move: { x: mx, y: my }, look: { dx: lx, dy: ly }, swing, jump, zip, drop, sprint, walk, quick, rope, usingPad, ctrl, slingL, slingR });
     for (const k of ['swing', 'jump', 'zip', 'drop', 'sprint', 'walk', 'quick', 'rope']) {
       state[k + 'Pressed'] = state[k] && !prev[k];
       state[k + 'Released'] = !state[k] && prev[k];

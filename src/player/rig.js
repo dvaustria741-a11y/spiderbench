@@ -245,6 +245,8 @@ export async function loadCharacter(renderer) {
   let root, bones, clips = [];
   if (gltf) {
     root = gltf.scene; clips = gltf.animations || [];
+    // swim clips (Quaternius Universal Animation Library, CC0), pre-retargeted to this skeleton: swimIdle (treading water), swimFwd
+    try { const r = await fetch('/assets/swim_clips.json'); if (r.ok) for (const j of await r.json()) clips.push(THREE.AnimationClip.parse(j)); } catch (e) { console.warn('[player] swim clips unavailable', e); }
     root.traverse(o => {
       if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
     });

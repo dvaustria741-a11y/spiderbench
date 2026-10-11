@@ -18,6 +18,7 @@ export const HEIGHT = 1.8;           // capsule height
 const STEP = 0.55;                   // max step-up (curbs, low ledges)
 const G = 24, GS = 25;               // gravity (air / swinging)
 const WALK = 2.6, RUN = 9.8, SPRINT = 15.5;
+const TOUCH_JOG = 4.8; // touch stick alone = jog; hold the sprint button (parkour) for the full run
 // user r12: holding Shift on the ground = a natural slow WALK (~1.4 m/s, ~1.85 steps/s). walkK (0..1) eases between the
 // run and walk target speeds over ~0.4 s (press / release while moving blends, never snaps); gentle start / stop ramps
 // and turn rate while walking. Ground sprint stays removed (user r4 #9) — 'sprint' only appears from carried momentum.
@@ -208,6 +209,7 @@ export function createTraversal({ world, cam, web, rig, camera }) {
     let target = 0;
     if (!locked && mag > 0.08) {
       target = mag < 0.55 ? WALK * mag / 0.55 + 0.4 : WALK + (RUN - WALK) * (mag - 0.55) / 0.45;
+      if (I.touchMove && !parkour && !s.sub.startsWith('land')) target = Math.min(target, TOUCH_JOG * clamp(mag / 0.6, 0.5, 1)); // stick alone never sprints
       if (wk > 1e-3) target += (WALK_SLOW * clamp(mag / 0.6, 0.45, 1) - target) * wk; // Shift walk (eased, see walkK)
       if (s.charging) target *= 1 - 0.75 * s.jumpCharge;
       const want = Math.atan2(inD.x, inD.z); const d = angWrap(want - s.facing);
