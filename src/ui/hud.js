@@ -19,7 +19,8 @@ function css() {
   s.textContent = `
   #hud{position:fixed;inset:0;pointer-events:none;font-family:Rajdhani,'Barlow Condensed','Arial Narrow',sans-serif;color:#fff;z-index:10;transition:opacity .4s}
   #hud.hidden{opacity:0}
-  .mm-wrap{position:absolute;right:2.4vw;bottom:1.9vh;width:17vw;min-width:200px}
+  .mm-wrap{position:absolute;right:max(2vw,env(safe-area-inset-right));top:max(1.5vh,env(safe-area-inset-top));width:13vw;min-width:190px}
+  .mm-in{position:relative}
   .mm-compass{position:relative;aspect-ratio:999/122;margin-bottom:-.6vw}
   .mm-compass img,.mm-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;user-select:none}
   .mm-compass canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -65,7 +66,7 @@ export function createHud({ player, world, camera }) {
   css();
   const root = document.getElementById('hud') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'hud' }));
   root.innerHTML = `
-    <div class="mm-wrap"><div class="mm">
+    <div class="mm-wrap"><div class="mm-in">
       <div class="mm-compass"><img src="${HUD_ART}compass.png" draggable="false"><canvas></canvas></div>
       <div class="mm-box"><div class="mm-map"><canvas></canvas></div><img class="mm-frame" src="${HUD_ART}mmframe.png" draggable="false"></div>
     </div></div>
