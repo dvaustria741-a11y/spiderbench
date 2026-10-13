@@ -28,13 +28,16 @@ const CLASSIC_DISTRICTS = [
 
 // Open map (3 x 3 regions over the layout image's land, x -900..700, z -550..490); same ids / landmark names so saves stay compatible
 const R = (x0, x1, z0, z1) => ({ x0, x1, z0, z1 });
-const OPEN_DISTRICTS = CLASSIC_DISTRICTS.map((d, k) => {
+// 3 x 3 regions cut at xs / zs; the anchors are the centres of the regions clipped to the land (lx0..lx1, lz0..lz1)
+const gridDistricts = (xs, zs, [lx0, lx1, lz0, lz1]) => CLASSIC_DISTRICTS.map((d, k) => {
   const col = [0, 1, 2, 0, 1, 2, 0, 1, 2][k], row = [0, 0, 0, 1, 1, 1, 2, 2, 2][k];
-  const xs = [-2000, -370, 160, 2000], zs = [-1500, -200, 150, 1500];
   const rect = R(xs[col], xs[col + 1], zs[row], zs[row + 1]);
-  return { ...d, rect, anchor: [(Math.max(xs[col], -880) + Math.min(xs[col + 1], 690)) / 2, (Math.max(zs[row], -530) + Math.min(zs[row + 1], 470)) / 2] };
+  return { ...d, rect, anchor: [(Math.max(xs[col], lx0) + Math.min(xs[col + 1], lx1)) / 2, (Math.max(zs[row], lz0) + Math.min(zs[row + 1], lz1)) / 2] };
 });
-export const DISTRICTS = MAP === 'open' ? OPEN_DISTRICTS : CLASSIC_DISTRICTS;
+const OPEN_DISTRICTS = gridDistricts([-2000, -370, 160, 2000], [-1500, -200, 150, 1500], [-880, 690, -530, 470]);
+// Harbor District (world/harborlayout.js): land x -850..850, z -470..470; the centre column is the 4 central avenues
+const HARBOR_DISTRICTS = gridDistricts([-2000, -290, 290, 2000], [-1500, -180, 180, 1500], [-840, 840, -460, 460]);
+export const DISTRICTS = MAP === 'harbor' ? HARBOR_DISTRICTS : MAP === 'open' ? OPEN_DISTRICTS : CLASSIC_DISTRICTS;
 
 const ITEMS = [
   ['Science Fair Ribbon', 'First place, Midtown Science High. The volcano was Harry\'s idea.'], ['Library Card', 'Overdue since sophomore year. Sorry, Ms. Kemper.'],
@@ -175,7 +178,7 @@ export function buildWorldData(world) {
   // ------------------------------------------------ landmarks (tallest notable building per district)
   const landmarks = DISTRICTS.map(d => {
     const [ax, az] = d.anchor;
-    if (d.id === 'park') return { id: 'lm_park', district: d.id, name: d.landmark, desc: d.lmDesc, target: V(0, 3, -760), radius: 60, fp: null };
+    if (d.id === 'park') return { id: 'lm_park', district: d.id, name: d.landmark, desc: d.lmDesc, target: MAP === 'harbor' ? V(ax, 3, az) : V(0, 3, -760), radius: 60, fp: null };
     let best = null;
     for (const f of byDistrict.get(d.id)) {
       if (Math.hypot(f.cx - ax, f.cz - az) > 600 || f.w < 14 || f.d < 14) continue;
@@ -213,7 +216,7 @@ export function buildWorldData(world) {
 }
 
 function stationName(x, z) {
-  if (MAP === 'open') { const a = Math.round(x / G.AV_SP) + 7, k = Math.round(z / G.ST_SP) + 5; return `${String.fromCharCode(65 + Math.max(0, Math.min(25, a)))}-${k + 1} Junction`; }
+  if (MAP !== 'classic') { const a = Math.round(x / G.AV_SP) + 7, k = Math.round(z / G.ST_SP) + 5; return `${String.fromCharCode(65 + Math.max(0, Math.min(25, a)))}-${k + 1} Junction`; }
   const av = Math.round(x / G.AV_SP);
   const avNames = { '-6': '14th Av', '-5': '13th Av', '-4': '12th Av', '-3': '11th Av', '-2': '10th Av', '-1': '8th Av', '0': '6th Av', '1': '5th Av', '2': 'Lexington Av' };
   const st = Math.round(59 - (z + 480) / 80 * 2.5);

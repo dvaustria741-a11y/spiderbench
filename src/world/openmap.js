@@ -1,7 +1,7 @@
 // Open map layout (pure data, no three.js). Replaces the Manhattan layout for the lightweight world (citylite.js).
 // Axes: +x = east, -z = north, y up, meters. The layout is a raster of ground classes (openlayout.js, generated from the
 // layout image): avenues / streets / junctions, sidewalks, two parks, the centre plaza, lots and the outside.
-import { CELL, NX, NZ, X0, Z0, RLE, BOUNDS, PARKS, PLAZA, BLOCKS, LOTS, AVENUES, STREETS, EXITS, SPAWN } from './openlayout.js';
+import { CELL, NX, NZ, X0, Z0, RLE, BOUNDS, PARKS, PLAZA, BLOCKS, LOTS, AVENUES, STREETS, EXITS, SPAWN, LOT_INSET } from './openlayouts.js';
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -102,7 +102,7 @@ export function generateLots() {
   const out = [];
   LOTS.forEach((L, n) => {
     const rnd = mulberry32(0xB10C + n * 131), B = blockAt((L[0] + L[2]) / 2, (L[1] + L[3]) / 2) ?? { kind: KIND_BUILD, downtown: false };
-    const m = 6 + rnd() * 4, lx0 = L[0] + m, lx1 = L[2] - m, lz0 = L[1] + m, lz1 = L[3] - m;
+    const m = LOT_INSET[0] + rnd() * LOT_INSET[1], lx0 = L[0] + m, lx1 = L[2] - m, lz0 = L[1] + m, lz1 = L[3] - m;
     if (lx1 - lx0 < 22 || lz1 - lz0 < 22) return;
     const downtown = Math.abs((L[0] + L[2]) / 2) < 400 && Math.abs((L[1] + L[3]) / 2) < 300, t = rnd();
     const H = downtown ? (t < 0.2 ? 130 + rnd() * 70 : t < 0.65 ? 70 + rnd() * 55 : 38 + rnd() * 28) : (t < 0.08 ? 80 + rnd() * 40 : t < 0.5 ? 28 + rnd() * 34 : 12 + rnd() * 18);

@@ -7,7 +7,8 @@ import { createOpenTraffic } from './opentraffic.js';
 import { loadOpenSkin, skinGround, skinRoof, skinTree } from './openskin.js';
 import { loadVehicleModels } from './vehicles.js';
 import { G, avenues, streets, blocks, generateLots, streetsAt, hash2, mulberry32, KINDS, inPark, GRID, RASTER, CLS, cellAt, PARKS, EXITS, SPAWN } from './openmap.js';
-import { MESH, LINES } from './openlayout.js';
+import { MESH, LINES } from './openlayouts.js';
+import { MAP_ID } from './mapid.js';
 import { Solids, CollisionGrid, makeQueries, collisionDebugLines } from './collision.js';
 import { ZipPoints, createGeoDebug } from './zippoints.js';
 import { attachLife } from './npc/life.js';
@@ -359,7 +360,9 @@ export async function buildCity({ scene, renderer }) {
   // ---------------------------------------------------------------- buildings
   const solids = new Solids(), zips = new ZipPoints();
   const boxes = [], footprints = [];
-  const lots = new URLSearchParams(location.search).has('buildings') ? generateLots() : []; // buildings are off while the ground is reworked (?buildings brings them back)
+  const qs = new URLSearchParams(location.search);
+  // Open City: buildings are off while the ground is reworked (?buildings brings them back). Harbor District has them on (?nobuildings turns them off)
+  const lots = (MAP_ID === 'harbor' ? !qs.has('nobuildings') : qs.has('buildings')) ? generateLots() : [];
   const WALL = [0xd8cfc0, 0xc9b9a6, 0xb5a191, 0xa9a9a2, 0xd6d0c6, 0x9a8f86, 0xc4c8c8, 0xb08c78, 0x8f9aa3].map(col);
   const GLASS = [0x6f8aa3, 0x5d7f96, 0x7d94a6, 0x4f6b82].map(col);
   const ROOF = col(0x5d5b58), HV = col(0x8d8f90), BASE = col(0x565551);

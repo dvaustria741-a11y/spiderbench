@@ -20,6 +20,7 @@
 //   Night-city hooks read nightK (src/render/daynight.js), set per preset (night 1, dusk 0.7, overcast 0.3).
 import * as THREE from 'three';
 import { getQuality } from './quality.js';
+import { IS_OPEN_STYLE } from '../world/mapid.js';
 import { createSky } from './sky.js';
 import { CSM } from './csm.js';
 import { installSurfaceChunks, ambShared } from './surface.js';
@@ -104,7 +105,7 @@ const SF_LOOK = { vertFill: 0.85, vertBounce: 0.55, warm: 0.03, env: 1.75, envSp
 PRESETS.sf = { elevation: 58, azimuth: 118, look: { ...SF_LOOK } };
 PRESETS.sfB = { elevation: 50, azimuth: 58, look: { ...SF_LOOK } };
 PRESETS.sfC = { elevation: 44, azimuth: 160, look: { ...SF_LOOK } };
-const OPEN_MAP = (() => { try { const p = new URLSearchParams(location.search).get('map'); return p ? p === 'open' : localStorage.getItem('sb_map') === 'open'; } catch (e) { return false; } })();
+const OPEN_MAP = IS_OPEN_STYLE; // Open City and Harbor District (see world/mapid.js)
 const OPEN_SWAP = { day: 'sf', dayB: 'sfB', dayC: 'sfC' };
 
 // old names (settings saves, ?tod=, tools) -> closest preset

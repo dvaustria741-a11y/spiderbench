@@ -108,11 +108,12 @@ export function createMainMenu(sys, ctx) {
     return { progress: p => L.progress(p), close: () => { L.el.style.transition = 'opacity .4s'; L.el.style.opacity = 0; setTimeout(() => L.el.remove(), 450); } };
   }
   const nextFrame = () => new Promise(r => requestAnimationFrame(r));
-  // ---- map chooser (Play): Manhattan (classic, heavy) or the open city (light, fast). The map is built at startup, so a
+  // ---- map chooser (Play): Manhattan (classic, heavy), the open city or the harbor district (both light, fast). The map is built at startup, so a
   // different choice is saved and the page reloads straight into the game on that map.
   const MAPS = [
     { id: 'classic', name: 'Manhattan', desc: 'The full dense city: thousands of buildings, traffic and crowds. Needs a strong device.' },
     { id: 'open', name: 'Open City', desc: 'A big city with wide open spaces, far fewer buildings and trees. Much faster on phones.' },
+    { id: 'harbor', name: 'Harbor District', desc: 'A waterfront city with a harbour basin, piers, a lagoon, a greenbelt and a tidy downtown grid. Light enough for phones.' },
   ];
   function chooseMapThenPlay() {
     if (!active || document.getElementById('mapsel')) return; audio.sfx.select();

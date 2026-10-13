@@ -158,7 +158,7 @@ export function createMapPage(sys) {
   const toSY = (x, y, z) => toS(x + y * K_E, z - y * K_UP); // oblique 3D projection (matches the extruded base map)
   const _cd = new THREE.Vector3();
   const toW = (sx, sy) => [(sx * dpr - W / 2) / (view.s * dpr) + view.x, (sy * dpr - H / 2) / (view.s * dpr) + view.z];
-  const LAND = MAP === 'open' ? { x0: G.X_MIN - 60, x1: G.X_MAX + 60, z0: G.Z_MIN - 60, z1: G.Z_MAX + 60 } : { x0: -820, x1: 900, z0: -3540, z1: 3390 };
+  const LAND = MAP !== 'classic' ? { x0: G.X_MIN - 60, x1: G.X_MAX + 60, z0: G.Z_MIN - 60, z1: G.Z_MAX + 60 } : { x0: -820, x1: 900, z0: -3540, z1: 3390 };
   function clampView() {
     const cw = (W || innerWidth * dpr) / dpr, ch = (H || innerHeight * dpr) / dpr;
     const minS = Math.min(cw / (LAND.x1 - LAND.x0), ch / (LAND.z1 - LAND.z0)) * 0.96;
